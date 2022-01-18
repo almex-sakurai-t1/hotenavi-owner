@@ -17,6 +17,7 @@
 |7|contents_mobile|text|Yes||ガラケー向けhtmlコード　%TOTAL%→access_cntに変換、%TODAY%→access_todayに変換、%YESTERDAY%→access_prev に変換|
 |8|disp_flag|int(1)|Yes|0|1:表示（旧ホテナビのみ適用）　新ホテナビの表示有無はcssで調整|
 
+
 ## Indexes
 
 |No.|インデックス名|カラムリスト|主キー|ユニーク|備考|
