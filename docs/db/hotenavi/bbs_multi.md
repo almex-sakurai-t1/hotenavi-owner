@@ -27,4 +27,4 @@
 |No.|インデックス名|カラムリスト|主キー|ユニーク|備考|
 |:--|:--|:--|:--|:--|:--|
 |1|hotel_id,msg_id,sub_id|Yes|Yes||
-![image](https://user-images.githubusercontent.com/59679568/149923165-8f5be28f-4e46-419f-98bf-5ebb3b725702.png)
+
