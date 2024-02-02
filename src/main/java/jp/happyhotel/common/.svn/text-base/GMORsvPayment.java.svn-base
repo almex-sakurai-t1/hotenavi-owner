@@ -1,0 +1,191 @@
+package jp.happyhotel.common;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.sql.Connection;
+import java.util.List;
+import java.util.Properties;
+
+import jp.happyhotel.data.DataHhRsvCredit;
+import jp.happyhotel.data.DataHhRsvCreditError;
+import jp.happyhotel.data.DataHhRsvCreditHistory;
+import jp.happyhotel.data.DataRsvReserve;
+
+import org.apache.commons.lang.StringUtils;
+
+import com.gmo_pg.g_pay.client.output.AlterTranOutput;
+import com.gmo_pg.g_pay.client.output.ErrHolder;
+
+/**
+ * 
+ * GMOペイメントプログラム実行クラス
+ * 
+ * @author Y.Tanabe
+ * @version 1.0 2011/11/07
+ */
+public class GMORsvPayment
+{
+    // ショップID
+    private String shopId           = "";
+    // ショップパスワード
+    private String shopPass         = "";
+    // ショップID(Lvj)
+    private String shopIdLvj        = "";
+    // ショップパスワード(Lvj)
+    private String shopPassLvj      = "";
+
+    final String   JOB_CODE_CHECK   = "CHECK";  // 有効性チェック
+    final String   JOB_CODE_CAPTURE = "CAPTURE"; // 即時売上
+    final String   JOB_CODE_AUTH    = "AUTH";   // 仮売上
+    final String   JOB_CODE_SAUTH   = "SAUTH";  // 簡易オーソリ
+    final String   JOB_CODE_SALES   = "SALES";  // 実売上
+
+    public boolean getGmoShopConf()
+    {
+        boolean ret = true;
+        try
+        {
+            Properties prop;
+            FileInputStream propfile = new FileInputStream( "/etc/happyhotel/gmo.conf" );
+            prop = new Properties();
+            // ﾌﾟﾛﾊﾟﾃｨﾌｧｲﾙからｷｰと値のﾘｽﾄを読み込みます
+            prop.load( propfile );
+            // "jdbc.datasource"に設定されている値を取得します
+            this.shopId = prop.getProperty( "ShopID" );
+            this.shopPass = prop.getProperty( "ShopPass" );
+            this.shopIdLvj = prop.getProperty( "ShopIDLvj" );
+            this.shopPassLvj = prop.getProperty( "ShopPassLvj" );
+            prop = null;
+            propfile.close();
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[GMOPayment.getGmoShopConf()] Exception:" + e.toString(), "GMOPayment.getGmoShopConf()" );
+            ret = false;
+        }
+        return ret;
+
+    }
+
+    /**
+     * 実売上
+     * 
+     * @param paramId ホテルID
+     * @param reserveNo 予約No
+     * @return 処理結果情報
+     */
+    public AlterTranOutput AlterTran(int paramId, String reserveNo, Connection connection)
+    {
+        AlterTranOutput ret = null;
+        DataHhRsvCredit dhrc = new DataHhRsvCredit();
+        DataHhRsvCreditError dhrce = null;
+        DataHhRsvCreditHistory dhrch = new DataHhRsvCreditHistory();
+        DataRsvReserve dhrr = new DataRsvReserve();
+        int jobSeq = 0;
+        try
+        {
+
+            if ( getGmoShopConf() != false )
+            {
+                if ( dhrc.getData( connection, reserveNo ) != false && dhrr.getData( connection, paramId, reserveNo ) != false )
+                {
+                    System.out.println( "[RsvCreditAlterTran] reserveNo=" + reserveNo );
+
+                    String shop_id = shopId;
+                    String shop_pass = shopPass;
+                    if ( dhrr.getExtFlag() == 1 ) // lvjからの予約
+                    {
+                        shop_id = shopIdLvj;
+                        shop_pass = shopPassLvj;
+                    }
+
+                    GMOModuleWrapper.AlterTranParam param = new GMOModuleWrapper.AlterTranParam();
+                    param.setShopId( shop_id );
+                    param.setShopPassword( shop_pass );
+                    param.setAccessId( dhrc.getAccessId() );
+                    param.setAccessPassword( dhrc.getAccessPass() );
+                    param.setJobCode( JOB_CODE_SALES );
+                    param.setAmount( dhrc.getAmount() );
+
+                    // API呼び出し
+                    ret = GMOModuleWrapper.alterTran( param );
+                    System.out.println( "[RsvCreditAlterTran] ret=" + ret.isErrorOccurred() );
+
+                    // 処理履歴書き込み
+                    dhrch.setOrderId( dhrc.getOrderId() );
+                    dhrch.setJobCd( JOB_CODE_SALES );
+                    dhrch.setAmount( dhrc.getAmount() );
+                    if ( ret.isErrorOccurred() )
+                    {
+                        dhrch.setErrorFlag( 1 );
+                    }
+                    else
+                    {
+                        dhrch.setForwarded( ret.getForward() );
+                        dhrch.setApproved( ret.getApprove() );
+                        dhrch.setTranid( ret.getTranId() );
+                        dhrch.setResearveNo( dhrc.getReserveNo() );
+                        dhrch.setRegistDate( Integer.parseInt( ret.getTranDate().substring( 0, 8 ) ) );
+                        dhrch.setRegistTime( Integer.parseInt( ret.getTranDate().substring( 8, 14 ) ) );
+                    }
+                    dhrch.insertData( connection );
+
+                    if ( dhrch.getData( connection, dhrc.getOrderId() ) )
+                    {
+                        // 付与された処理連番を抽出
+                        jobSeq = dhrch.getJobSeq();
+                    }
+
+                    if ( ret.isErrorOccurred() )
+                    {
+                        List<ErrHolder> list = ret.getErrList();
+                        // エラー時の履歴
+                        for( int i = 0 ; i < list.size() ; i++ )
+                        {
+                            dhrce = new DataHhRsvCreditError();
+                            dhrce.setOrderId( dhrc.getOrderId() );
+                            dhrce.setJobSeq( jobSeq );
+                            dhrce.setErrorCode( list.get( i ).getErrCode() );
+                            dhrce.setErrorInfo( list.get( i ).getErrInfo() );
+                            // レコード追加
+                            dhrce.insertData( connection );
+                        }
+                    }
+                    else
+                    { // 決済完了
+                      // クレジットデータを実売上済に変更する。
+                        dhrc.setSalesFlag( ReserveCommon.PAYMENT_STATUS_SETTLED );
+                        dhrc.setSalesDate( Integer.parseInt( ret.getTranDate().substring( 0, 8 ) ) );
+                        dhrc.setSalesTime( Integer.parseInt( ret.getTranDate().substring( 8, 14 ) ) );
+                        dhrc.setLastUpdate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        dhrc.setLastUptime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        dhrc.setCreditFee( (int)(dhrc.getAmount() * ReserveCommon.CREDIT_RATES / 100) );
+                        dhrc.updateData( connection );
+                        // 予約データを決済済みにする。
+                        if ( dhrr.getData( connection, paramId, reserveNo ) != false )
+                        {
+                            dhrr.updatePaymentStatus( connection, paramId, reserveNo );
+                        }
+
+                        // 連泊予約の場合、二日目以降の予約データも決済済みにする
+                        if ( StringUtils.isBlank( dhrr.getReserveNoMain() ) == false )
+                        {
+                            String reserveNoMain = reserveNo.substring( reserveNo.indexOf( "-" ) + 1 );
+                            dhrr.updatePaymentStatus( connection, paramId, reserveNoMain, ReserveCommon.PAYMENT_STATUS_SETTLED );
+                        }
+                    }
+                }
+            }
+        }
+        catch ( IOException e )
+        {
+            Logging.error( "GMOPayment.AlterTran() IOException=" + e.toString(), "GMOPayment.AlterTran()" );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "GMOPayment.AlterTran() Exception=" + e.toString(), "GMOPayment.AlterTran()" );
+        }
+
+        return(ret);
+    }
+}

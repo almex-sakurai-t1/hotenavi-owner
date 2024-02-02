@@ -1,0 +1,233 @@
+/*
+ * @(#)OwnerLoginInfo.java 1.00 2007/07/31 Copyright (C) ALMEX Inc. 2007 オーナーログイン情報取得クラス
+ */
+
+package jp.happyhotel.owner;
+
+import java.io.*;
+import java.sql.*;
+
+import jp.happyhotel.data.*;
+import jp.happyhotel.common.*;
+
+/**
+ * オーナーログイン情報取得クラス。 オーナーログイン情報を取得する機能を提供する
+ * 
+ * @author S.Shiiya
+ * @version 1.00 2007/07/31
+ * @version 1.00 2007/12/03
+ */
+public class OwnerLoginInfo implements Serializable
+{
+    /**
+	 *
+	 */
+    private static final long     serialVersionUID = 705628811172679729L;
+
+    private int                   ownerUserCount;
+    private DataOwnerUser         ownerUser;
+    private DataOwnerUserSecurity ownerUserSecurity;
+    private DataHotenaviHotel     hotenaviHotel;
+
+    /**
+     * データを初期化します。
+     */
+    public OwnerLoginInfo()
+    {
+        ownerUserCount = 0;
+        ownerUser = new DataOwnerUser();
+        ownerUserSecurity = new DataOwnerUserSecurity();
+        hotenaviHotel = new DataHotenaviHotel();
+    }
+
+    /** オーナー基本情報件数取得 **/
+    public int getCount()
+    {
+        return(ownerUserCount);
+    }
+
+    /** オーナー基本情報取得 **/
+    public DataOwnerUser getUserInfo()
+    {
+        return(ownerUser);
+    }
+
+    /** オーナーアクセス権情報取得 **/
+    public DataOwnerUserSecurity getUserSecurityInfo()
+    {
+        return(ownerUserSecurity);
+    }
+
+    /** ホテナビホテル情報取得 **/
+    public DataHotenaviHotel getHotenaviHotel()
+    {
+        return(hotenaviHotel);
+    }
+
+    /**
+     * オーナー基本情報を取得する（IDから）
+     * 
+     * @param netId ネットワークID
+     * @param netPass ネットワークパスワード
+     * @param userId ユーザID
+     * @param userPass ユーザパスワード
+     * @return 処理結果(TRUE:正常,FALSE:異常)
+     */
+    public boolean getLogin(String netId, String netPass, String userId, String userPass)
+    {
+        boolean ret;
+        String query;
+        Connection connection = null;
+        PreparedStatement prestate = null;
+
+        query = "SELECT owner_user.* FROM owner_user,hotel";
+        query = query + " WHERE hotel.owner_user = ? AND hotel.owner_password = ?";
+        query = query + " AND owner_user.loginid = ? AND owner_user.passwd_pc = ?";
+        query = query + " AND hotel.hotel_id = owner_user.hotelid";
+
+        ret = false;
+
+        try
+        {
+            connection = DBConnection.getConnection();
+            prestate = connection.prepareStatement( query );
+            prestate.setString( 1, netId );
+            prestate.setString( 2, netPass );
+            prestate.setString( 3, userId );
+            prestate.setString( 4, userPass );
+
+            ret = getLoginSub( prestate );
+            if ( ret != false )
+            {
+                // ホテナビホテル情報取得
+                hotenaviHotel = new DataHotenaviHotel();
+                hotenaviHotel.getData( this.ownerUser.getHotelId() );
+                // セキュリティ情報取得
+                ownerUserSecurity = new DataOwnerUserSecurity();
+                ownerUserSecurity.getData( this.ownerUser.getHotelId(), this.ownerUser.getUserId() );
+            }
+
+        }
+        catch ( Exception e )
+        {
+            Logging.info( "[OwnerLoginInfo.getLogin] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( prestate );
+            DBConnection.releaseResources( connection );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * オーナー基本情報を取得する（クッキーから）
+     * 
+     * @param cookieValue クッキー値
+     * @return 処理結果(TRUE:正常,FALSE:異常)
+     */
+    public boolean getLoginByCookie(String cookieValue)
+    {
+        boolean ret;
+        String query;
+        String hotelId;
+        String userId;
+        Connection connection = null;
+        PreparedStatement prestate = null;
+
+        if ( cookieValue == null )
+        {
+            return(false);
+        }
+
+        hotelId = cookieValue.substring( 0, cookieValue.indexOf( ":" ) );
+        userId = cookieValue.substring( cookieValue.indexOf( ":" ) + 1 );
+
+        query = "SELECT owner_user.* FROM owner_user";
+        query = query + " WHERE owner_user.hotelid = ? AND owner_user.userid = ?";
+
+        ret = false;
+
+        try
+        {
+            connection = DBConnection.getConnection();
+            prestate = connection.prepareStatement( query );
+
+            prestate.setString( 1, hotelId );
+            prestate.setString( 2, userId );
+
+            ret = getLoginSub( prestate );
+            if ( ret != false )
+            {
+                // ホテナビホテル情報取得
+                hotenaviHotel = new DataHotenaviHotel();
+                hotenaviHotel.getData( this.ownerUser.getHotelId() );
+                // セキュリティ情報取得
+                ownerUserSecurity = new DataOwnerUserSecurity();
+                ownerUserSecurity.getData( this.ownerUser.getHotelId(), this.ownerUser.getUserId() );
+            }
+
+        }
+        catch ( Exception e )
+        {
+            Logging.info( "[OwnerLoginInfo.getLoginByCookie] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( prestate );
+            DBConnection.releaseResources( connection );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * オーナー基本情報のデータをセット
+     * 
+     * @param prestate プリペアドステートメント
+     * @return 処理結果(TRUE:正常,FALSE:異常)
+     */
+    private boolean getLoginSub(PreparedStatement prestate)
+    {
+        ResultSet result = null;
+
+        try
+        {
+            result = prestate.executeQuery();
+
+            if ( result != null )
+            {
+                ownerUser = new DataOwnerUser();
+
+                if ( result.next() != false )
+                {
+                    ownerUserCount = 1;
+                    // オーナー基本データ情報の設定
+                    this.ownerUser.setData( result );
+                }
+                else
+                {
+                    ownerUserCount = 0;
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.info( "[OwnerLoginInfo.getLoginSub] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( result );
+        }
+
+        if ( ownerUserCount != 0 )
+        {
+            return(true);
+        }
+        else
+        {
+            return(false);
+        }
+    }
+}

@@ -1,0 +1,537 @@
+package jp.happyhotel.common;
+
+import JP.co.ccsjens.ccsware.client.CwRpc;
+
+/**
+ * GMOクレジット決済クラス
+ * 
+ * <pre>
+ *  /etc/happyhotel/gmoccscredit.conf にて接続先等の設定を行う。
+ *  必要モジュール(外部jar)：ccsware.jar,cwextmag.jar,cwextssl.jar
+ *  エラーコードについて：A99->SPIDパラメタエラー,A98->カード番号エラー,A97->有効期限エラー,A96->支払金額エラー,A95->GMO関連のException
+ * </pre>
+ * 
+ * @author S.Shiiya
+ * @version 1.00 2012/03/05
+ */
+public class GMOCcsCredit
+{
+    // GMOクレジット設定ファイル
+    private final String PROPFILE         = Constants.configFilesPath + "gmoccscredit.conf";
+    // 簡易オーソリーJOBコード
+    private final String JOB_SAUTH        = "SAUTH";
+    // 売上処理JOBコード
+    private final String JOB_CAPTURE      = "CAPTURE";
+    // 売上取消処理JOBコード
+    private final String JOB_RETURN       = "RETURN";
+
+    // カード番号桁数
+    private final int    CARDNO_MAXLENGTH = 16;
+
+    // 決済正常時エラーコード
+    private final String SETTLEMENT_OK    = "   ";
+
+    // リモートプロシージャコール
+    private CwRpc        rpc;
+
+    // SPID
+    private String       spid;
+    // クレジットカード番号
+    private String       cardNo;
+    // 有効期限(YYMM)
+    private String       cardExpire;
+    // 支払金額
+    private int          amount;
+
+    // トランザクションID
+    private String       tranId;
+    // 承認番号
+    private String       approveNo;
+    // 仕向先コード
+    private String       forwardCode;
+    // エラーコード
+    private String       errorCode;
+    // 詳細エラーコード
+    private String       errorInfo;
+    // エラーレベル
+    private int          errorLevel;
+    // 取消トランザクションID
+    private String       cancelTranId;
+
+    public GMOCcsCredit()
+    {
+        spid = "";
+        cardNo = "";
+        cardExpire = "";
+        amount = 0;
+
+        tranId = "";
+        approveNo = "";
+        forwardCode = "";
+        errorCode = "";
+        errorInfo = "";
+        errorLevel = 0;
+        cancelTranId = "";
+    }
+
+    /**
+     * SPIDを取得します
+     * 
+     * @return SPID
+     */
+    public String getSpid()
+    {
+        return spid;
+    }
+
+    /**
+     * SPIDを設定します
+     * 
+     * @param spid SPID
+     */
+    public void setSpid(String spid)
+    {
+        this.spid = spid;
+    }
+
+    /**
+     * カード番号を取得します
+     * 
+     * @return カード番号
+     */
+    public String getCardNo()
+    {
+        return cardNo;
+    }
+
+    /**
+     * カード番号を設定します
+     * 
+     * @param cardNo カード番号
+     */
+    public void setCardNo(String cardNo)
+    {
+        this.cardNo = cardNo;
+    }
+
+    /**
+     * カード有効期限を取得します
+     * 
+     * @return カード有効期限
+     */
+    public String getCardExpire()
+    {
+        return cardExpire;
+    }
+
+    /**
+     * カード有効期限を設定します
+     * 
+     * @param cardExpire カード有効期限
+     */
+    public void setCardExpire(String cardExpire)
+    {
+        this.cardExpire = cardExpire;
+    }
+
+    /**
+     * 支払金額を取得します
+     * 
+     * @return 支払金額
+     */
+    public int getAmount()
+    {
+        return amount;
+    }
+
+    /**
+     * 支払金額を設定します
+     * 
+     * @param amount 支払金額
+     */
+    public void setAmount(int amount)
+    {
+        this.amount = amount;
+    }
+
+    /**
+     * トランザクションIDを取得します
+     * 
+     * @return トランザクションID
+     */
+    public String getTranId()
+    {
+        return tranId;
+    }
+
+    /**
+     * 承認番号を取得します
+     * 
+     * @return 承認番号
+     */
+    public String getApproveNo()
+    {
+        return approveNo;
+    }
+
+    /**
+     * 仕向先コードを取得します
+     * 
+     * @return 仕向先コード
+     */
+    public String getForwardCode()
+    {
+        return forwardCode;
+    }
+
+    /**
+     * エラーコードを取得します
+     * 
+     * @return エラーコード
+     */
+    public String getErrorCode()
+    {
+        return errorCode;
+    }
+
+    /**
+     * 詳細エラーコードを取得します
+     * 
+     * @return 詳細エラーコード
+     */
+    public String getErrorInfo()
+    {
+        return errorInfo;
+    }
+
+    /**
+     * エラーレベルを取得します
+     * 
+     * @return エラーレベル
+     */
+    public int getErrorLevel()
+    {
+        return errorLevel;
+    }
+
+    /**
+     * 取消対象のトランザクションIDをセットします
+     * 
+     * @param cancelTranId 取消対象トランザクションID
+     */
+    public void setCancelTranId(String cancelTranId)
+    {
+        this.cancelTranId = cancelTranId;
+    }
+
+    /**
+     * 簡易オーソリ処理（与信枠確保）
+     * 
+     * @return 処理結果（true:正常終了,false:異常終了） false時はerrorCode or errorInfoを参照
+     */
+    public boolean execAuthority()
+    {
+        while( true )
+        {
+            // 入力パラメタチェック
+            if ( this.spid.length() <= 0 )
+            {
+                this.errorCode = "A99";
+                break;
+            }
+            if ( this.cardNo.length() <= 0 )
+            {
+                this.errorCode = "A98";
+                break;
+            }
+            if ( this.cardExpire.length() <= 0 )
+            {
+                this.errorCode = "A97";
+                break;
+            }
+            if ( this.amount <= 0 )
+            {
+                this.errorCode = "A96";
+                break;
+            }
+
+            try
+            {
+                // １円オーソリの実行
+                rpc = new CwRpc( this.PROPFILE );
+                rpc.setPriority( 0 );
+                rpc.setJob( this.JOB_SAUTH );
+                rpc.setSpid( this.spid );
+                rpc.setCard( adjustCardNo( this.cardNo ) );
+                rpc.setExpire( this.cardExpire );
+                rpc.setForward( "" );
+                rpc.setItem( "0000990" );
+                rpc.setAmount( 1 );
+                rpc.setTax( 0 );
+                rpc.setMethod( "10" );
+
+                // ジョブの実行
+                rpc.exec();
+
+                // 結果をセットする
+                this.tranId = rpc.getTranid();
+                this.approveNo = rpc.getApproved();
+                this.forwardCode = rpc.getForwarded();
+                this.errorCode = rpc.getErrCode();
+                this.errorInfo = rpc.getErrInfo();
+                this.errorLevel = rpc.getErrLevel();
+
+                // 正常時のみcommitを実行
+                if ( this.errorLevel == 0 )
+                {
+                    rpc.commit( this.tranId );
+                }
+                else
+                {
+                    rpc.rollback( this.tranId );
+                    break;
+                }
+                // エラーコードが"   "以外だった場合は決済エラー
+                if ( this.errorCode.compareTo( SETTLEMENT_OK ) != 0 )
+                {
+                    break;
+                }
+            }
+            catch ( Exception e )
+            {
+                this.errorCode = "A95";
+                Logging.error( "GMOCcsCredit.execAuthority(SAUTH):" + e.toString() );
+                break;
+            }
+
+            return(true);
+        }
+
+        return(false);
+    }
+
+    /**
+     * 実売上処理
+     * 
+     * @return 処理結果（true:正常終了,false:異常終了） false時はerrorCode or errorInfoを参照
+     */
+    public boolean execSales()
+    {
+        while( true )
+        {
+            // 入力パラメタチェック
+            if ( this.spid.length() <= 0 )
+            {
+                this.errorCode = "A99";
+                break;
+            }
+            if ( this.cardNo.length() <= 0 )
+            {
+                this.errorCode = "A98";
+                break;
+            }
+            if ( this.cardExpire.length() <= 0 )
+            {
+                this.errorCode = "A97";
+                break;
+            }
+            if ( this.amount <= 0 )
+            {
+                this.errorCode = "A96";
+                break;
+            }
+
+            try
+            {
+                // 実売上の実行
+                rpc = new CwRpc( this.PROPFILE );
+                rpc.setPriority( 0 );
+                rpc.setJob( this.JOB_CAPTURE );
+                rpc.setSpid( this.spid );
+                rpc.setCard( adjustCardNo( this.cardNo ) );
+                rpc.setExpire( this.cardExpire );
+                rpc.setForward( "" );
+                rpc.setItem( "0000990" );
+                rpc.setAmount( this.amount );
+                rpc.setTax( 0 );
+                rpc.setMethod( "10" );
+
+                // ジョブの実行
+                rpc.exec();
+
+                // 結果をセットする
+                this.tranId = rpc.getTranid();
+                this.approveNo = rpc.getApproved();
+                this.forwardCode = rpc.getForwarded();
+                this.errorCode = rpc.getErrCode();
+                this.errorInfo = rpc.getErrInfo();
+                this.errorLevel = rpc.getErrLevel();
+
+                // 正常時のみcommitを実行
+                if ( this.errorLevel == 0 )
+                {
+                    rpc.commit( this.tranId );
+                }
+                else
+                {
+                    rpc.rollback( this.tranId );
+                    break;
+                }
+                // エラーコードが"   "以外だった場合は決済エラー
+                if ( this.errorCode.compareTo( SETTLEMENT_OK ) != 0 )
+                {
+                    break;
+                }
+            }
+            catch ( Exception e )
+            {
+                this.errorCode = "A95";
+                Logging.error( "GMOCcsCredit.execSales(CAPTURE):" + e.toString() );
+                break;
+            }
+
+            return(true);
+        }
+
+        return(false);
+    }
+
+    /**
+     * 実売上取消処理
+     * 
+     * @return 処理結果（true:正常終了,false:異常終了） false時はerrorCode or errorInfoを参照
+     */
+    public boolean execCancelSales()
+    {
+        while( true )
+        {
+            // 入力パラメタチェック
+            if ( this.spid.length() <= 0 )
+            {
+                this.errorCode = "A99";
+                break;
+            }
+            if ( this.cardNo.length() <= 0 )
+            {
+                this.errorCode = "A98";
+                break;
+            }
+            if ( this.cardExpire.length() <= 0 )
+            {
+                this.errorCode = "A97";
+                break;
+            }
+            if ( this.amount <= 0 )
+            {
+                this.errorCode = "A96";
+                break;
+            }
+            if ( this.cancelTranId.length() <= 0 )
+            {
+                this.errorCode = "A94";
+                break;
+            }
+
+            try
+            {
+                // 実売上の実行
+                rpc = new CwRpc( this.PROPFILE );
+                rpc.setPriority( 0 );
+                rpc.setJob( this.JOB_RETURN );
+                rpc.setSpid( this.spid );
+                rpc.setCard( adjustCardNo( this.cardNo ) );
+                rpc.setExpire( this.cardExpire );
+                rpc.setForward( "" );
+                rpc.setItem( "0000990" );
+                rpc.setAmount( this.amount );
+                rpc.setTax( 0 );
+                rpc.setMethod( "10" );
+                rpc.setCantranid( this.cancelTranId );
+                rpc.setCanjob( this.JOB_CAPTURE );
+
+                // ジョブの実行
+                rpc.exec();
+
+                // 結果をセットする
+                this.tranId = rpc.getTranid();
+                this.approveNo = rpc.getApproved();
+                this.forwardCode = rpc.getForwarded();
+                this.errorCode = rpc.getErrCode();
+                this.errorInfo = rpc.getErrInfo();
+                this.errorLevel = rpc.getErrLevel();
+
+                // 正常時のみcommitを実行
+                if ( this.errorLevel == 0 )
+                {
+                    rpc.commit( this.tranId );
+                }
+                else
+                {
+                    rpc.rollback( this.tranId );
+                    break;
+                }
+                // エラーコードが"   "以外だった場合は決済エラー
+                if ( this.errorCode.compareTo( SETTLEMENT_OK ) != 0 )
+                {
+                    break;
+                }
+            }
+            catch ( Exception e )
+            {
+                this.errorCode = "A95";
+                Logging.error( "GMOCcsCredit.execCancelSales(RETURN):" + e.toString() );
+                break;
+            }
+
+            return(true);
+        }
+
+        return(false);
+    }
+
+    /**
+     * SPID確認処理
+     * 
+     * @param id ホテルID
+     * @param spid DBに設定されているSPID
+     * @param frontip フロントPC-IPアドレス
+     * @return 処理結果(TRUE:同じ値,FALSE:違う値）
+     */
+    public boolean checkSPID(int id, String spid, String frontip)
+    {
+        boolean ret;
+        String hotelSPID;
+
+        GetHotelSPID hgspid = new GetHotelSPID();
+
+        ret = false;
+
+        // front_ipを渡しSPIDを確認する
+        hotelSPID = hgspid.requestSPID( frontip );
+        if ( hotelSPID.compareTo( spid ) == 0 )
+        {
+            ret = true;
+        }
+
+        return(ret);
+    }
+
+    /**
+     * カード番号補正処理
+     * 
+     * @param beforeCardNo 補正前カード番号
+     * @return 補正後カード番号
+     */
+    private String adjustCardNo(String beforeCardNo)
+    {
+        String workCard = "";
+
+        for( int i = beforeCardNo.trim().length() ; i < CARDNO_MAXLENGTH ; i++ )
+        {
+            workCard = workCard + "0";
+        }
+        workCard = workCard + beforeCardNo.trim();
+
+        return(workCard);
+    }
+}

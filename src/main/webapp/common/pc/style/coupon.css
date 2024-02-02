@@ -1,0 +1,25 @@
+hr {
+	border: 2px dotted #660000;
+}
+.name {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 21px;
+	font-weight: bold;
+}
+.service {
+	font-family: "‚l‚r ƒSƒVƒbƒN", "Osaka|“™•";
+	font-size: 24px;
+}
+.coupon {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 16px;
+}
+.syosai {
+	font-family: "‚l‚r ƒSƒVƒbƒN", "Osaka|“™•";
+	font-size: 12px;
+}
+.waribiki {
+	font-family: "‚l‚r ƒSƒVƒbƒN", "Osaka|“™•";
+	font-size: 46px;
+	font-weight: bolder;
+}

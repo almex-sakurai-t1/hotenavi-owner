@@ -1,0 +1,94 @@
+package jp.happyhotel.action;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.common.Message;
+import jp.happyhotel.common.OwnerBkoCommon;
+import jp.happyhotel.common.OwnerRsvCommon;
+import jp.happyhotel.owner.FormOwnerBkoComingMonth;
+import jp.happyhotel.owner.FormOwnerRsvMenu;
+import jp.happyhotel.owner.LogicOwnerBkoComingMonth;
+
+public class ActionOwnerBkoComingMonth extends BaseAction
+{
+    private RequestDispatcher requestDispatcher = null;
+    private static final int MENU_FLG = 120;    //月別来店状況確認画面
+
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        FormOwnerRsvMenu frmMenu;
+        FormOwnerBkoComingMonth frmMonth;
+        LogicOwnerBkoComingMonth logic;
+        int paramHotelID = 0;
+        int paramUserId = 0;
+        String paramHotenaviId = "";
+        int hotelId = 0;
+        int menuFlg = 0;
+        int paramYear = 0;
+        String errMsg = "";
+        int billFlg = 0;
+
+        try
+        {
+            frmMonth = new FormOwnerBkoComingMonth();
+            frmMenu = new FormOwnerRsvMenu();
+            logic = new LogicOwnerBkoComingMonth();
+
+            // ▼画面の値を取得
+            // ホテルID
+            if ( request.getParameter( "selHotelIDValue" ) != null )
+            {
+                paramHotelID = Integer.parseInt( request.getParameter( "selHotelIDValue" ).toString() );
+            }
+            paramUserId = OwnerRsvCommon.getCookieLoginUserId(request.getCookies());
+            paramYear = Integer.parseInt( request.getParameter( "selYear" ) );
+            paramHotenaviId = OwnerRsvCommon.getCookieLoginHotenavi( request.getCookies() );
+
+            // 値をフォームにセット
+            frmMonth.setSelHotelID( paramHotelID );
+            frmMonth.setSelYear( paramYear );
+            menuFlg = MENU_FLG;
+
+            // 請求閲覧可能フラグ
+            billFlg = OwnerBkoCommon.getBillOwnFlg( paramHotenaviId, paramUserId );
+            frmMonth.setBillFlg( billFlg );
+
+            //データ取得
+            logic.setFrm( frmMonth );
+            logic.getAccountRecv();
+
+            // メニューの設定
+            frmMenu.setUserId( paramUserId );
+            OwnerRsvCommon.setMenu( frmMenu, paramHotelID, menuFlg, request.getCookies() );
+
+            // 画面遷移
+            request.setAttribute( "FORM_Menu", frmMenu );
+            request.setAttribute( "FORM_comMonth", frmMonth );
+            requestDispatcher = request.getRequestDispatcher( "owner_rsv_base.jsp" );
+            requestDispatcher.forward( request, response );
+        }
+        catch ( Exception exception )
+        {
+            Logging.error( "[ActionOwnerBkoComingMonth.execute() ][hotelId = " + hotelId + "] Exception", exception );
+            try
+            {
+                errMsg = Message.getMessage( "erro.30005" );
+                request.setAttribute( "errMsg", errMsg );
+                requestDispatcher = request.getRequestDispatcher( request.getContextPath() + "/reserve/reserve_error_PC.jsp" );
+                requestDispatcher.forward( request, response );
+            }
+            catch ( Exception subException )
+            {
+                Logging.error( "[ActionOwnerBkoComingMonth.execute() ] - Unable to dispatch....."  + subException.toString() );
+            }
+        }
+        finally
+        {
+//            logic = null;
+        }
+    }
+}

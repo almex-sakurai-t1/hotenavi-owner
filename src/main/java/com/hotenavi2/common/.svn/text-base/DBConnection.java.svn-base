@@ -1,0 +1,159 @@
+package com.hotenavi2.common;
+
+import java.io.FileInputStream;
+import java.io.Serializable;
+import java.sql.Connection;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.sql.Statement;
+import java.util.Properties;
+
+import javax.naming.Context;
+import javax.naming.InitialContext;
+import javax.sql.DataSource;
+
+public class DBConnection implements Serializable
+{
+	private static final long serialVersionUID = 239312761897519395L;
+	private static String jdbcds = null;
+	/**
+	 * DataSource Object
+	 */
+	private static DataSource  objDS = null;
+	/**
+	 * JNDI root context
+	 */
+	private static Context initCtx = null;
+	
+	static
+	{
+        try
+        {
+            Properties    prop;
+            FileInputStream propfile = new FileInputStream("/etc/hotenavi/dbconnect.conf");
+            prop = new Properties();
+            // ÌßÛÊßÃ¨Ì§²Ù‚©‚ç·°‚Æ’l‚ÌØ½Ä‚ð“Ç‚Ýž‚Ý‚Ü‚·
+            prop.load(propfile);
+            // "jdbc.datasource"‚ÉÝ’è‚³‚ê‚Ä‚¢‚é’l‚ðŽæ“¾‚µ‚Ü‚·
+            jdbcds = prop.getProperty("jdbc.datasource");
+            prop = null;
+            propfile.close();
+        } catch( Exception e ){
+        	Logging.error("DBConnection Static Block Error="+e.toString());
+        }
+	}	
+	/**
+	 * This method returns the Database connection object.
+	 * @return Connection
+	 * @throws Exception
+	 */
+	public static Connection getConnection() throws Exception {
+		Logging.debug("getConnection called");
+		Connection conn = null;
+		try {
+				if( initCtx == null ){
+					initCtx = new InitialContext();
+				}
+				if (objDS == null) {
+					  objDS = (DataSource) initCtx.lookup(jdbcds);
+				}
+				conn = objDS.getConnection();
+				if (conn == null)
+					Logging.info(" DBConnection - getConnection() ---> Connection:null");
+			} catch (Exception ex){
+				Logging.error(" DBConnection - getConnection() ---> connection failed : " + ex.toString());
+				throw ex;
+			}
+		return conn;
+
+	}
+
+	/**
+	 * This method closes database resources and returns the connection object
+	 * back to the pooler
+	 * 
+	 * @param resultset
+	 * @param statement
+	 * @param connection
+	 */
+	public static void releaseResources(ResultSet resultset,
+		Statement statement, Connection connection)  {
+		try {
+			if (resultset != null) {
+				resultset.close();
+				resultset = null;
+			}
+			if (statement != null) {
+				statement.close();
+				statement = null;
+			}
+			if (connection != null) {
+				connection.close();
+				connection = null;
+			}
+
+		} catch (SQLException se) {
+			Logging.error("Error while closing the connection resources"+se.toString());
+		} catch (Exception ex) {
+			Logging.error("Error while closing the connection resources"+ex.toString());
+		}
+	}
+	
+	/**
+	 * This method closes database connection and returns the connection object
+	 * back to the pooler
+	 * @param connection
+	 */
+	public static void releaseResources(Connection connection)  {
+		try {
+			if (connection != null) {
+				connection.close();
+				connection = null;
+			}
+
+		} catch (SQLException se) {
+			Logging.error("Error while closing the connection resources"+se.toString());
+		} catch (Exception ex) {
+			Logging.error("Error while closing the connection resources"+ex.toString());
+		}
+	}
+	
+	/**
+	 * This method closes resultset.
+	 * @param resultset
+	 */
+	public static void releaseResources(ResultSet resultset)  {
+		try {
+			if (resultset != null) {
+				resultset.close();
+				resultset = null;
+			}
+			
+		} catch (SQLException se) {
+			Logging.error("Error while closing the resultset "+se.toString());
+		} catch (Exception ex) {
+			Logging.error("Error while closing the resultset "+ex.toString());
+		}
+	}
+	
+	/**
+	 * This method closes statement.
+	 * @param statement
+	 */
+	public static void releaseResources(Statement statement)  {
+		try {
+			if (statement != null) {
+				statement.close();
+				statement = null;
+			}
+
+		} catch (SQLException se) {
+			Logging.error("Error while closing the statement "+se.toString());
+		} catch (Exception ex) {
+			Logging.error("Error while closing the statement "+ex.toString());
+		}
+	}
+
+} // end class DBConnection
+
+

@@ -1,0 +1,40 @@
+<!-- note: this version of the color picker is optimized for IE 5.5+ only -->
+
+<html STYLE="width: 238px; height: 187px"><head><title>画像の表示</title>
+<link href="../../common/pc/style/contents.css" rel="stylesheet" type="text/css">
+<script language="javascript">
+
+function _CloseOnEsc() {
+  if (event.keyCode == 27) { window.close(); return; }
+}
+
+function Init() {                                                       // run on page load
+  document.body.onkeypress = _CloseOnEsc;
+  document.linkform.IMG.value = opener.document.form1.imglink.value;
+}
+
+function Set() {
+  opener.document.form1.imglink.value = document.linkform.IMG.value;
+  window.opener.enclose('<img src=\"' + document.linkform.IMG.value + '\" alt=\"', '\" border=0>');
+  window.close();
+ }
+
+</script>
+</head>
+<body bgcolor="buttonface" topmargin=0 leftmargin=0 onload="Init();">
+
+<form name="linkform" method=get onSubmit="Set(); return false;">
+
+<table border=0 cellspacing=0 cellpadding=4 width=100%>
+ <tr>
+    <td bgcolor="buttonface" valign=center class=size12><br/><br/>　表示画像（.jpg .gif .png のみ）
+         <input type="text" name="IMG" value="" size=45 style="font-size: 12px">
+    </td>
+ </tr>
+ <tr>
+  <td bgcolor="buttonface" align="right"><input type="button" onclick="Set();return false;" value="表示"></td>
+ </tr>
+</table>
+
+</form>
+</body></html>

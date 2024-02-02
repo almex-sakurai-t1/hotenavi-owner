@@ -1,0 +1,903 @@
+package jp.happyhotel.common;
+
+import java.io.FileInputStream;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+import java.util.Properties;
+
+import jp.happyhotel.data.DataUserBasic;
+import jp.happyhotel.data.DataUserCredit;
+import jp.happyhotel.data.DataUserCreditHistory;
+import jp.happyhotel.user.UserCreditInfo;
+
+import com.gmo_pg.g_pay.client.output.DeleteCardOutput;
+import com.gmo_pg.g_pay.client.output.DeleteMemberOutput;
+import com.gmo_pg.g_pay.client.output.ErrHolder;
+import com.gmo_pg.g_pay.client.output.SaveCardOutput;
+import com.gmo_pg.g_pay.client.output.SaveMemberOutput;
+import com.gmo_pg.g_pay.client.output.SearchCardOutput;
+import com.gmo_pg.g_pay.client.output.SearchCardOutput.CardInfo;
+import com.gmo_pg.g_pay.client.output.SearchCardReverseOutput;
+import com.gmo_pg.g_pay.client.output.SearchCardReverseOutput.MemberCardInfo;
+import com.gmo_pg.g_pay.client.output.SearchMemberOutput;
+
+/**
+ * 
+ * GMOペイメントプログラム実行クラス
+ * 
+ * @author Y.Tanabe
+ * @version 1.0 2011/11/07
+ */
+public class GMOPayment
+{
+    // サイトID
+    private String siteid;
+    // サイトパスワード
+    private String sitepassword;
+
+    public GMOPayment()
+    {
+        Properties prop = null;
+
+        try
+        {
+            // サイトIDとサイトパスワードをセット
+            prop = new Properties();
+            // プロパティファイルからキーと値のリストを読み込みます
+            prop.load( new FileInputStream( "/etc/happyhotel/GMOCredit.conf" ) );
+            // 設定値のセット
+            this.siteid = prop.getProperty( "gmo.siteid" );
+            this.sitepassword = prop.getProperty( "gmo.sitepass" );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "GMOPayment.GMOPayment() Exception=" + e.toString() );
+        }
+
+    }
+
+    /**
+     * 会員登録処理
+     * 
+     * @param memberid 会員ID
+     * @param membername 会員名
+     * @return 処理結果情報
+     */
+    public SaveMemberOutput ExecuteSaveMember(String memberid, String membername)
+    {
+        SaveMemberOutput ret = null;
+        DataUserCreditHistory history = null;
+
+        try
+        {
+            if ( siteid != null && !siteid.equals( "" ) &&
+                    sitepassword != null && !sitepassword.equals( "" ) )
+            {
+                GMOModuleWrapper.SaveMemberParam param = new GMOModuleWrapper.SaveMemberParam();
+                param.setSiteId( siteid );
+                param.setSitePassword( sitepassword );
+                param.setMemberId( memberid );
+                param.setMemberName( membername );
+
+                // API呼び出し
+                ret = GMOModuleWrapper.saveMember( param );
+
+                if ( ret.isErrorOccurred() )
+                {
+                    List<ErrHolder> list = ret.getErrList();
+                    // エラー時の履歴
+                    for( int i = 0 ; i < list.size() ; i++ )
+                    {
+                        history = new DataUserCreditHistory();
+                        history.setUser_id( memberid );
+                        history.setCard_seq_no( 0 );
+                        history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setError_code( list.get( i ).getErrCode() );
+                        history.setError_detail_code( list.get( i ).getErrInfo() );
+                        history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_MEMBERREGIST );
+                        // レコード追加
+                        history.insertData();
+                    }
+                }
+                else
+                {
+                    // 正常終了の履歴
+                    history = new DataUserCreditHistory();
+                    history.setUser_id( memberid );
+                    history.setCard_seq_no( 0 );
+                    history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                    history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                    history.setError_code( "" );
+                    history.setError_detail_code( "" );
+                    history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_MEMBERREGIST );
+                    // レコード追加
+                    history.insertData();
+                }
+            }
+        }
+        catch ( IOException e )
+        {
+            Logging.error( "GMOPayment.ExecuteSaveMember() IOException=" + e.toString() );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "GMOPayment.ExecuteSaveMember() Exception=" + e.toString() );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * 会員削除処理
+     * 
+     * @param memberid 会員ID
+     * @return 処理結果情報
+     */
+    public DeleteMemberOutput ExecuteDeleteMember(String memberid)
+    {
+        DeleteMemberOutput ret = null;
+        DataUserCreditHistory history = null;
+
+        try
+        {
+            if ( siteid != null && !siteid.equals( "" ) &&
+                    sitepassword != null && !sitepassword.equals( "" ) )
+            {
+                GMOModuleWrapper.DeleteMemberParam param = new GMOModuleWrapper.DeleteMemberParam();
+                param.setSiteId( siteid );
+                param.setSitePassword( sitepassword );
+                param.setMemberId( memberid );
+
+                // API呼び出し
+                ret = GMOModuleWrapper.deleteMember( param );
+
+                if ( ret.isErrorOccurred() )
+                {
+                    List<ErrHolder> list = ret.getErrList();
+                    // エラー時の履歴
+                    for( int i = 0 ; i < list.size() ; i++ )
+                    {
+                        history = new DataUserCreditHistory();
+                        history.setUser_id( memberid );
+                        history.setCard_seq_no( 0 );
+                        history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setError_code( list.get( i ).getErrCode() );
+                        history.setError_detail_code( list.get( i ).getErrInfo() );
+                        history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_MEMBERDELETE );
+                        // レコード追加
+                        history.insertData();
+                    }
+                }
+                else
+                {
+                    // 正常終了の履歴
+                    history = new DataUserCreditHistory();
+                    history.setUser_id( memberid );
+                    history.setCard_seq_no( 0 );
+                    history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                    history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                    history.setError_code( "" );
+                    history.setError_detail_code( "" );
+                    history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_MEMBERDELETE );
+                    // レコード追加
+                    history.insertData();
+                }
+            }
+        }
+        catch ( IOException e )
+        {
+            Logging.error( "GMOPayment.ExecuteDeleteMember() IOException=" + e.toString() );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "GMOPayment.ExecuteDeleteMember() Exception=" + e.toString() );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * カード登録/更新処理
+     * 
+     * @param memberid 会員ID
+     * @param cardseq カード登録連番
+     * @param cardno カード番号
+     * @param expire 有効期限
+     * @param insertFlag 登録フラグ
+     * @return 処理結果情報
+     */
+    public SaveCardOutput ExecuteSaveCard(String memberid, int cardseq, String cardno, String expire, Boolean insertFlag)
+    {
+        SaveCardOutput ret = null;
+        DataUserCreditHistory history = null;
+
+        try
+        {
+            if ( siteid != null && !siteid.equals( "" ) &&
+                    sitepassword != null && !sitepassword.equals( "" ) )
+            {
+                GMOModuleWrapper.SaveCardParam param = new GMOModuleWrapper.SaveCardParam();
+                param.setSiteId( siteid );
+                param.setSitePassword( sitepassword );
+                param.setMemberId( memberid );
+                param.setMode( "1" ); // 物理モード
+                param.setInsertFlag( insertFlag );
+                param.setCardSeq( param.getInsertFlag() ? null : cardseq ); // 新規でない場合のみカードシーケンス番号を指定
+                param.setCardNo( cardno );
+                param.setExpire( expire );
+
+                // API呼び出し
+                ret = GMOModuleWrapper.saveCard( param );
+
+                if ( ret.isErrorOccurred() )
+                {
+                    List<ErrHolder> list = ret.getErrList();
+                    // エラー時の履歴
+                    for( int i = 0 ; i < list.size() ; i++ )
+                    {
+                        history = new DataUserCreditHistory();
+                        history.setUser_id( memberid );
+                        history.setCard_seq_no( cardseq );
+                        history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setError_code( list.get( i ).getErrCode() );
+                        history.setError_detail_code( list.get( i ).getErrInfo() );
+                        history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_CARDREGIST );
+                        // レコード追加
+                        history.insertData();
+                    }
+                }
+                else
+                {
+                    // 正常終了の履歴
+                    history = new DataUserCreditHistory();
+                    history.setUser_id( memberid );
+                    history.setCard_seq_no( ret.getCardSeq() );
+                    history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                    history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                    history.setError_code( "" );
+                    history.setError_detail_code( "" );
+                    history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_CARDREGIST );
+                    // レコード追加
+                    history.insertData();
+                }
+            }
+        }
+        catch ( IOException e )
+        {
+            Logging.error( "GMOPayment.ExecuteSaveCard() IOException=" + e.toString() );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "GMOPayment.ExecuteSaveCard() Exception=" + e.toString() );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * カード登録/更新処理
+     * 
+     * @param memberid 会員ID
+     * @param cardseq カード登録連番
+     * @param cardno カード番号
+     * @param expire 有効期限
+     * @param insertFlag 登録フラグ
+     * @return 処理結果情報
+     */
+    public SaveCardOutput ExecuteSaveCard(String memberid, int cardseq, String token, Boolean insertFlag)
+    {
+        SaveCardOutput ret = null;
+        DataUserCreditHistory history = null;
+
+        try
+        {
+            if ( siteid != null && !siteid.equals( "" ) &&
+                    sitepassword != null && !sitepassword.equals( "" ) )
+            {
+                GMOModuleWrapper.SaveCardParam param = new GMOModuleWrapper.SaveCardParam();
+                param.setSiteId( siteid );
+                param.setSitePassword( sitepassword );
+                param.setMemberId( memberid );
+                param.setMode( "1" ); // 物理モード
+                param.setInsertFlag( insertFlag );
+                param.setCardSeq( param.getInsertFlag() ? null : cardseq ); // 新規でない場合のみカードシーケンス番号を指定
+                param.setToken( token );
+
+                // API呼び出し
+                ret = GMOModuleWrapper.saveCard( param );
+
+                if ( ret.isErrorOccurred() )
+                {
+                    List<ErrHolder> list = ret.getErrList();
+                    // エラー時の履歴
+                    for( int i = 0 ; i < list.size() ; i++ )
+                    {
+                        history = new DataUserCreditHistory();
+                        history.setUser_id( memberid );
+                        history.setCard_seq_no( cardseq );
+                        history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setError_code( list.get( i ).getErrCode() );
+                        history.setError_detail_code( list.get( i ).getErrInfo() );
+                        history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_CARDREGIST );
+                        // レコード追加
+                        history.insertData();
+                    }
+                }
+                else
+                {
+                    // 正常終了の履歴
+                    history = new DataUserCreditHistory();
+                    history.setUser_id( memberid );
+                    history.setCard_seq_no( ret.getCardSeq() );
+                    history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                    history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                    history.setError_code( "" );
+                    history.setError_detail_code( "" );
+                    history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_CARDREGIST );
+                    // レコード追加
+                    history.insertData();
+                }
+            }
+        }
+        catch ( IOException e )
+        {
+            Logging.error( "GMOPayment.ExecuteSaveCard() IOException=" + e.toString() );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "GMOPayment.ExecuteSaveCard() Exception=" + e.toString() );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * カード削除処理
+     * 
+     * @param memberid 会員ID
+     * @param cardseq カード登録連番
+     * @return 処理結果情報
+     */
+    public DeleteCardOutput ExecuteDeleteCard(String memberid, int cardseq)
+    {
+        DeleteCardOutput ret = null;
+        DataUserCreditHistory history = null;
+
+        try
+        {
+            if ( siteid != null && !siteid.equals( "" ) &&
+                    sitepassword != null && !sitepassword.equals( "" ) )
+            {
+                GMOModuleWrapper.DeleteCardParam param = new GMOModuleWrapper.DeleteCardParam();
+                param.setSiteId( siteid );
+                param.setSitePassword( sitepassword );
+                param.setMemberId( memberid );
+                param.setMode( "1" ); // 物理モード
+                param.setCardSeq( cardseq );
+
+                // API呼び出し
+                ret = GMOModuleWrapper.deleteCard( param );
+
+                if ( ret.isErrorOccurred() )
+                {
+                    List<ErrHolder> list = ret.getErrList();
+                    // エラー時の履歴
+                    for( int i = 0 ; i < list.size() ; i++ )
+                    {
+                        history = new DataUserCreditHistory();
+                        history.setUser_id( memberid );
+                        history.setCard_seq_no( cardseq );
+                        history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setError_code( list.get( i ).getErrCode() );
+                        history.setError_detail_code( list.get( i ).getErrInfo() );
+                        history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_CARDDELETE );
+                        // レコード追加
+                        history.insertData();
+                    }
+                }
+                else
+                {
+                    // 正常終了の履歴
+                    history = new DataUserCreditHistory();
+                    history.setUser_id( memberid );
+                    history.setCard_seq_no( ret.getCardSeq() );
+                    history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                    history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                    history.setError_code( "" );
+                    history.setError_detail_code( "" );
+                    history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_CARDDELETE );
+                    // レコード追加
+                    history.insertData();
+                }
+            }
+        }
+        catch ( IOException e )
+        {
+            Logging.error( "GMOPayment.ExecuteDeleteCard() IOException=" + e.toString() );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "GMOPayment.ExecuteDeleteCard() Exception=" + e.toString() );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * 会員情報参照処理
+     * 
+     * @param memberid 会員ID
+     * @return 検索結果情報
+     * 
+     */
+    public SearchMemberOutput GetSearchMember(String memberid)
+    {
+        SearchMemberOutput ret = null;
+        DataUserCreditHistory history = null;
+
+        try
+        {
+            if ( siteid != null && !siteid.equals( "" ) &&
+                    sitepassword != null && !sitepassword.equals( "" ) )
+            {
+                GMOModuleWrapper.SearchMemberParam param = new GMOModuleWrapper.SearchMemberParam();
+                param.setSiteId( siteid );
+                param.setSitePassword( sitepassword );
+                param.setMemberId( memberid );
+
+                // API呼び出し
+                ret = GMOModuleWrapper.searchMember( param );
+
+                if ( ret.isErrorOccurred() )
+                {
+                    List<ErrHolder> list = ret.getErrList();
+                    // エラー時の履歴
+                    for( int i = 0 ; i < list.size() ; i++ )
+                    {
+                        history = new DataUserCreditHistory();
+                        history.setUser_id( memberid );
+                        history.setCard_seq_no( 0 );
+                        history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setError_code( list.get( i ).getErrCode() );
+                        history.setError_detail_code( list.get( i ).getErrInfo() );
+                        history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_MEMBERSEARCH );
+                        // レコード追加
+                        history.insertData();
+                    }
+                }
+                else
+                {
+                    // 正常終了の履歴
+                    history = new DataUserCreditHistory();
+                    history.setUser_id( memberid );
+                    history.setCard_seq_no( 0 );
+                    history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                    history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                    history.setError_code( "" );
+                    history.setError_detail_code( "" );
+                    history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_MEMBERSEARCH );
+                    // レコード追加
+                    history.insertData();
+                }
+            }
+        }
+        catch ( IOException e )
+        {
+            Logging.error( "GMOPayment.GetSearchMember() IOException=" + e.toString() );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "GMOPayment.GetSearchMember() Exception=" + e.toString() );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * カード参照処理
+     * 
+     * @param memberid 会員ID
+     * @param cardseq カード登録連番
+     * @return 検索結果情報
+     */
+    public SearchCardOutput ExecuteSearchCard(String memberid, int cardseq)
+    {
+        SearchCardOutput ret = null;
+        DataUserCreditHistory history = null;
+
+        try
+        {
+            if ( siteid != null && !siteid.equals( "" ) &&
+                    sitepassword != null && !sitepassword.equals( "" ) )
+            {
+                GMOModuleWrapper.SearchCardParam param = new GMOModuleWrapper.SearchCardParam();
+                param.setSiteId( siteid );
+                param.setSitePassword( sitepassword );
+                param.setMemberId( memberid );
+                param.setMode( "1" ); // 物理モード
+                param.setCardSeq( cardseq );
+
+                // API呼び出し
+                ret = GMOModuleWrapper.searchCard( param );
+
+                if ( ret.isErrorOccurred() )
+                {
+                    List<ErrHolder> list = ret.getErrList();
+                    // エラー時の履歴
+                    for( int i = 0 ; i < list.size() ; i++ )
+                    {
+                        history = new DataUserCreditHistory();
+                        history.setUser_id( memberid );
+                        history.setCard_seq_no( cardseq );
+                        history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setError_code( list.get( i ).getErrCode() );
+                        history.setError_detail_code( list.get( i ).getErrInfo() );
+                        history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_CARDSEARCH );
+                        // レコード追加
+                        history.insertData();
+                    }
+                }
+                else
+                {
+                    // 正常終了の履歴
+                    history = new DataUserCreditHistory();
+                    history.setUser_id( memberid );
+                    history.setCard_seq_no( cardseq );
+                    history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                    history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                    history.setError_code( "" );
+                    history.setError_detail_code( "" );
+                    history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_CARDSEARCH );
+                    // レコード追加
+                    history.insertData();
+                }
+            }
+        }
+        catch ( IOException e )
+        {
+            Logging.error( "GMOPayment.ExecuteSearchCard() IOException=" + e.toString() );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "GMOPayment.ExecuteSearchCard() Exception=" + e.toString() );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * カード参照処理
+     * 
+     * @param memberid 会員ID
+     * @param cardseq カード登録連番
+     * @return 検索結果情報
+     */
+    public SearchCardOutput ExecuteSearchCard(String memberid)
+    {
+        SearchCardOutput ret = null;
+        DataUserCreditHistory history = null;
+
+        try
+        {
+            if ( siteid != null && !siteid.equals( "" ) &&
+                    sitepassword != null && !sitepassword.equals( "" ) )
+            {
+                GMOModuleWrapper.SearchCardParam param = new GMOModuleWrapper.SearchCardParam();
+                param.setSiteId( siteid );
+                param.setSitePassword( sitepassword );
+                param.setMemberId( memberid );
+                param.setMode( "0" );
+
+                // API呼び出し
+                ret = GMOModuleWrapper.searchCard( param );
+
+                if ( ret.isErrorOccurred() )
+                {
+                    List<ErrHolder> list = ret.getErrList();
+                    // エラー時の履歴
+                    for( int i = 0 ; i < list.size() ; i++ )
+                    {
+                        history = new DataUserCreditHistory();
+                        history.setUser_id( memberid );
+                        history.setCard_seq_no( 0 );
+                        history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setError_code( list.get( i ).getErrCode() );
+                        history.setError_detail_code( list.get( i ).getErrInfo() );
+                        history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_CARDSEARCH );
+                        // レコード追加
+                        history.insertData();
+                    }
+                }
+                else
+                {
+                    List<CardInfo> cardList = ret.getCardList();
+
+                    for( int i = 0 ; i < cardList.size() ; i++ )
+                    {
+                        // 正常終了の履歴
+                        history = new DataUserCreditHistory();
+                        history.setUser_id( memberid );
+                        history.setCard_seq_no( cardList.get( i ).getCardSeq() );
+                        history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setError_code( "" );
+                        history.setError_detail_code( "" );
+                        history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_CARDSEARCH );
+                        history.insertData();
+                    }
+                }
+            }
+        }
+        catch ( IOException e )
+        {
+            Logging.error( "GMOPayment.ExecuteSearchCard() IOException=" + e.toString() );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "GMOPayment.ExecuteSearchCard() Exception=" + e.toString() );
+        }
+
+        return(ret);
+    }
+
+    ArrayList<String> memberList = new ArrayList<String>();
+
+    public ArrayList<String> getMemberList()
+    {
+        return memberList;
+    }
+
+    /**
+     * 会員ID逆引き処理
+     * 
+     * @param Token トークン
+     * @return 検索結果情報
+     */
+    public SearchCardReverseOutput doSearchCardReverse(String token)
+    {
+        SearchCardReverseOutput ret = null;
+        DataUserCreditHistory history = null;
+
+        try
+        {
+            if ( siteid != null && !siteid.equals( "" ) &&
+                    sitepassword != null && !sitepassword.equals( "" ) )
+            {
+                GMOModuleWrapper.SearchCardReverseParam param = new GMOModuleWrapper.SearchCardReverseParam();
+                param.setSiteId( siteid );
+                param.setSitePassword( sitepassword );
+                param.setToken( token );
+
+                // API呼び出し
+                ret = GMOModuleWrapper.searchCardReverse( param );
+
+                if ( ret.isErrorOccurred() )
+                {
+                    List<ErrHolder> list = ret.getErrList();
+                    // エラー時の履歴
+                    for( int i = 0 ; i < list.size() ; i++ )
+                    {
+                        history = new DataUserCreditHistory();
+                        history.setUser_id( "token_" + Integer.parseInt( DateEdit.getDate( 2 ) ) + "_" + Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setCard_seq_no( 0 );
+                        history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setError_code( list.get( i ).getErrCode() );
+                        history.setError_detail_code( list.get( i ).getErrInfo() );
+                        history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_SEARCHCARDREVERSE );
+                        // レコード追加
+                        history.insertData();
+                    }
+                }
+                else
+                {
+                    List<MemberCardInfo> cardList = ret.getCardList();
+                    history = new DataUserCreditHistory();
+
+                    if ( cardList.size() == 0 )
+                    {
+                        history.setUser_id( "token_" + Integer.parseInt( DateEdit.getDate( 2 ) ) + "_" + Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setCard_seq_no( 0 );
+                        history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        history.setError_code( "0000" );
+                        history.setError_detail_code( "" );
+                        history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_SEARCHCARDREVERSE );
+                        // レコード追加
+                        history.insertData();
+                    }
+                    else
+                    {
+                        memberList = new ArrayList<String>();
+                        for( int i = 0 ; i < cardList.size() ; i++ )
+                        {
+                            // 正常終了の履歴
+                            history.setUser_id( cardList.get( i ).getMemberId() );
+                            if ( !cardList.get( i ).getDeleteFlag().equals( "1" ) )
+                            {
+                                memberList.add( cardList.get( i ).getMemberId() );
+                            }
+                            history.setCard_seq_no( 0 );
+                            history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                            history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                            history.setError_code( cardList.get( i ).getDeleteFlag().toString() );
+                            history.setError_detail_code( cardList.get( i ).getCreateDate().substring( 0, 8 ) );
+                            history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_GMO_SEARCHCARDREVERSE );
+                            // レコード追加
+                            history.insertData();
+                        }
+                    }
+                }
+            }
+        }
+        catch ( IOException e )
+        {
+            Logging.error( "GMOPayment.SearchCardReserve() IOException=" + e.toString() );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "GMOPayment.SearchCardReserve() Exception=" + e.toString() );
+        }
+        return(ret);
+    }
+
+    public boolean deleteGmoCreditData(String memberid)
+    {
+        boolean ret = false;
+        SearchCardOutput search_card = null;
+        DeleteCardOutput delete_card = null;
+        DeleteMemberOutput delete_member = null;
+
+        try
+        {
+            while( true )
+            {
+                // カード照会処理
+                search_card = ExecuteSearchCard( memberid );
+                List<CardInfo> cardList = search_card.getCardList();
+                if ( cardList.size() <= 0 )
+                {
+                    Logging.error( "[GMOpayment.deleteGmoCreditData()] : カード照会エラー " );
+                    break;
+                }
+                for( int i = 0 ; i < cardList.size() ; i++ )
+                {
+                    delete_card = ExecuteDeleteCard( memberid, cardList.get( i ).getCardSeq() );
+                    if ( delete_card.getErrList().size() > 0 )
+                    {
+                        Logging.error( "[GMOpayment.deleteGmoCreditData()] : カード削除エラー " );
+                        break;
+                    }
+                }
+
+                // 会員削除
+                delete_member = ExecuteDeleteMember( memberid );
+                if ( delete_member.getErrList().size() > 0 )
+                {
+                    Logging.error( "[GMOpayment.deleteGmoCreditData()] : 会員削除エラー " );
+                    break;
+                }
+                ret = true;
+                break;
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[GMOpayment.deleteGmoCreditData()] : Exception " + e.toString() );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * 解約処理
+     * 
+     * @param userid ユーザID
+     * @return エラーメッセージリスト
+     */
+    public boolean unregist(String userid)
+    {
+        UserCreditInfo usercredit = null;
+        DataUserCredit data = null;
+        DataUserBasic dub = null;
+        boolean ret = true;
+
+        try
+        {
+            if ( userid != null && !userid.equals( "" ) )
+            {
+                // 課金フラグが有効又は初回課金フラグのレコードを取得
+                usercredit = new UserCreditInfo();
+                data = usercredit.getPayMemberUserCredit( userid );
+                // 退会フラグを有効にする
+                data.setDel_flag( DataUserCredit.DELETEFLAG_TRUE );
+                // 登録月と同月内での退会時は初回課金フラグを変更する
+                if ( data.getRegist_date() / 100 == Integer.valueOf( DateEdit.getDate( 2 ) ) / 100 )
+                {
+                    // if ( data.getCharge_flag() == DataUserCredit.CHARGEFLAG_FIRSTPAY )
+                    // {
+                    // data.setCharge_flag( DataUserCredit.CHARGEFLAG_PAY );
+                    // }
+                }
+                // 強制解約なので、課金対象外とする
+                data.setCharge_flag( DataUserCredit.CHARGEFLAG_FREE );
+                data.setDel_date( Integer.valueOf( DateEdit.getDate( 2 ) ) );
+                data.setDel_time( Integer.valueOf( DateEdit.getTime( 1 ) ) );
+                // DBのステータス更新
+                if ( data.updateData() )
+                {
+                    // ユーザ基本データを解約する
+                    dub = new DataUserBasic();
+                    if ( dub.getData( userid ) )
+                    {
+                        int oldstatus = dub.getRegistStatusPay();
+                        dub.setRegistStatusOld( oldstatus );
+                        dub.setRegistStatusPay( 0 );
+                        dub.setDelDatePay( Integer.valueOf( DateEdit.getDate( 2 ) ) );
+                        dub.setDelTimePay( Integer.valueOf( DateEdit.getTime( 1 ) ) );
+                        dub.setDelFlag( 1 );
+                        dub.setMailAddr( "" );
+                        dub.setMailAddrMd5( "" );
+                        dub.setMailAddrMobile( "" );
+                        dub.setMailAddrMobileMd5( "" );
+                        dub.setDelDatePc( Integer.valueOf( DateEdit.getDate( 2 ) ) );
+                        dub.setDelTimePc( Integer.valueOf( DateEdit.getTime( 1 ) ) );
+                        dub.setDelReasonPay( "enter credit number" );
+
+                        if ( !dub.updateData( userid ) )
+                        {
+                            Logging.error( "[GMOpayment.unregist()] :有料会員解約" );
+                        }
+                    }
+                    else
+                    {
+                        Logging.error( "[GMOpayment.unregist()] :有料会員解約" );
+                    }
+                }
+                else
+                {
+                    Logging.error( "[GMOpayment.unregist()] :有料会員解約" );
+                }
+            }
+            else
+            {
+                Logging.error( "[GMOpayment.unregist()] userid=null 有料会員解約" );
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[GMOpayment.unregist()] Exception=" + e.toString() );
+        }
+
+        return(ret);
+    }
+
+    public void setSiteid(String siteid)
+    {
+        this.siteid = siteid;
+    }
+
+    public String getSiteid()
+    {
+        return siteid;
+    }
+
+    public void setSitepassword(String sitepassword)
+    {
+        this.sitepassword = sitepassword;
+    }
+
+    public String getSitepassword()
+    {
+        return sitepassword;
+    }
+}

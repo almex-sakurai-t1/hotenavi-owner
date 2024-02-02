@@ -1,0 +1,455 @@
+package jp.happyhotel.action;
+
+import java.util.ArrayList;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.CheckString;
+import jp.happyhotel.common.DateEdit;
+import jp.happyhotel.common.HotelIp;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.common.UserAgent;
+import jp.happyhotel.data.DataApErrorHistory;
+import jp.happyhotel.data.DataApHotelCustom;
+import jp.happyhotel.data.DataApHotelSetting;
+import jp.happyhotel.data.DataApTouchCoupon;
+import jp.happyhotel.data.DataHotelBasic;
+import jp.happyhotel.data.DataHotelRoomMore;
+import jp.happyhotel.data.DataMasterUseragent;
+import jp.happyhotel.data.DataUserBasic;
+import jp.happyhotel.dto.DtoApCommon;
+import jp.happyhotel.dto.DtoApCouponList;
+import jp.happyhotel.dto.DtoApCouponUnit;
+import jp.happyhotel.dto.DtoApHotelCustomer;
+import jp.happyhotel.dto.DtoApHotelCustomerData;
+import jp.happyhotel.dto.DtoApInquiryForm;
+import jp.happyhotel.dto.DtoApUserInfo;
+import jp.happyhotel.hotel.HotelCi;
+import jp.happyhotel.others.HapiTouchErrorMessage;
+import jp.happyhotel.touch.CheckIn;
+import jp.happyhotel.touch.FrontTouchAcceptCheck;
+import jp.happyhotel.touch.HotelTerminal;
+import jp.happyhotel.touch.MemberAcceptInfo;
+import jp.happyhotel.touch.MemberInfo;
+import jp.happyhotel.touch.TerminalTouch;
+import jp.happyhotel.touch.TouchCi;
+import jp.happyhotel.touch.TouchReception;
+import jp.happyhotel.touch.TouchUserCoupon;
+import jp.happyhotel.user.UserPointPay;
+
+/**
+ * ハピホテアプリチェックインクラス
+ * 
+ * @author S.Tashiro
+ * @version 1.0 2014/08/26
+ * 
+ */
+
+public class ActionHtHome extends BaseAction
+{
+    final String                       URL_MATCHING          = "happyhotel.jp";
+    final String                       HAPITOUCH             = "hapiTouch.act?method=HtCheckIn";
+    final String                       SP_URL                = "/phone/htap/";
+    final String                       FILE_URL              = "common.jsp";
+    final int                          COUPON_KIND_AUTO      = 0;
+    final int                          COUPON_KIND_MANUAL    = 1;
+    final int                          COUPON_NO_USE         = 0;
+    final int                          COUPON_USED1          = 1;
+    final int                          COUPON_USED10         = 10;
+    final int                          COUPON_USED100        = 100;
+    final int                          TIMEOUT               = 5000;
+    final int                          HOTENAVI_PORT_NO      = 7023;
+    final int                          HAPIHOTE_PORT_NO      = 7046;
+    final int                          RESULT_OK             = 1;
+    final int                          RESULT_NG             = 2;
+    final int                          DEPOSIT_NO            = 1;
+    final int                          DEPOSIT_CASH          = 2;
+    final int                          DEPOSIT_CREDIT        = 3;
+    final int                          NONREFUNDABLE         = 1;                               // 返金不可
+    final int                          CREDIT_NONREFUNDABLE  = 2;                               // クレジット精算の返金不可
+    final int                          CI_STATUS_NOT_DISPLAY = 3;                               // タッチPCへの非表示
+
+    private RequestDispatcher          requestDispatcher;
+    private DtoApCommon                apCommon;
+    private DtoApCouponList            apCouponList;
+    private DtoApInquiryForm           apInquiry;
+    private DtoApHotelCustomer         apHotelCustomer;
+    private DtoApHotelCustomerData     apHotelCustomerData;
+    private DtoApUserInfo              apUserInfo;
+    private ArrayList<DtoApCouponUnit> apCouponUnitList;
+
+    /**
+     * ハピホテタッチ
+     * 
+     * @param request リクエスト
+     * @param response レスポンス
+     */
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        int carrierFlag;
+        boolean ret = true;
+        boolean boolConnected = false; // ホスト連動
+        boolean boolHotelCustom = false;// 顧客対応状況
+        boolean boolMemberCheckIn = false; // メンバーチェックイン結果
+        boolean boolMemberAccept = false;// メンバー情報受付結果
+        boolean boolMemberInfo = false;// メンバー情報取得結果
+        boolean boolUseableMile = true;// マイル使用可能フラグ
+        boolean boolCouponAvailable = false;// クーポン利用可能フラグ
+        int nonrefundableFlag = 0; // 0:返金OK、1:返金不可、2:クレジット前受のみ返金不可
+        boolean boolMemberCardIssued = false; // メンバーカード発行有無
+        boolean reTouch = false;
+
+        String hapihoteIp = "";
+        String customId = "";
+        String securityCode = "";
+        String unavailableMessage = "";
+        int errorCode = 0;
+        int point = 0;
+        int point2 = 0;
+        String customRank = "";
+        String forwardUrl = "";
+        String paramId;
+        String paramSeq;
+        String userId = "";
+        int goodsCode = 0; // 商品コード
+        int goodsPrice = 0; // 金額
+        int nowPoint = 0;
+
+        DataUserBasic dub = new DataUserBasic();
+        DataHotelBasic dhb = new DataHotelBasic();
+        DataHotelRoomMore dhrm = new DataHotelRoomMore();
+        DataApHotelSetting dahs = new DataApHotelSetting();
+        DataApHotelCustom dahc = new DataApHotelCustom();
+        HotelTerminal ht = new HotelTerminal();
+        TerminalTouch tt = new TerminalTouch();
+        TouchCi tc = new TouchCi();
+        HotelCi hc = new HotelCi();
+        UserPointPay upp = new UserPointPay();
+        TouchUserCoupon tuc = new TouchUserCoupon();
+        MemberInfo memberInfo = new MemberInfo();
+        DataApTouchCoupon datc = new DataApTouchCoupon();
+
+        MemberAcceptInfo memberAcceptInfo = new MemberAcceptInfo();// メンバー受付情報クラス
+        try
+        {
+            paramId = request.getParameter( "id" );
+            paramSeq = request.getParameter( "seq" );
+            if ( paramId == null || paramId.equals( "" ) != false || CheckString.numCheck( paramId ) == false )
+            {
+                paramId = "0";
+            }
+            if ( paramSeq == null || paramSeq.equals( "" ) != false || CheckString.numCheck( paramSeq ) == false )
+            {
+                paramSeq = "0";
+            }
+            if ( request.getParameter( "reTouch" ) != null )
+            {
+                reTouch = request.getParameter( "reTouch" ).equals( "true" );
+            }
+
+            carrierFlag = UserAgent.getUserAgentTypeFromTouch( request );
+            // URLを判断
+            if ( carrierFlag == DataMasterUseragent.CARRIER_SMARTPHONE )
+            {
+                forwardUrl = SP_URL + FILE_URL;
+            }
+            else if ( carrierFlag == DataMasterUseragent.CARRIER_DOCOMO )
+            {
+                forwardUrl = "/i/htap/" + FILE_URL;
+            }
+            else if ( carrierFlag == DataMasterUseragent.CARRIER_AU )
+            {
+                forwardUrl = "/au/htap/" + FILE_URL;
+            }
+            else if ( carrierFlag == DataMasterUseragent.CARRIER_SOFTBANK )
+            {
+                forwardUrl = "/y/htap/" + FILE_URL;
+            }
+            else
+            {
+                if ( UserAgent.getUserAgentTypeString( request ).equals( "ipa" ) ||
+                        UserAgent.getUserAgentTypeString( request ).equals( "ada" ) )
+                {
+                    forwardUrl = SP_URL + FILE_URL;
+                }
+            }
+            if ( ret != false )
+            {
+                // ホテル情報を取得
+                ret = dhb.getData( Integer.parseInt( paramId ) );
+            }
+            if ( ret != false )
+            {
+                // ホテル設定を取得 // ホテル設定を取得
+                dahs.getData( Integer.parseInt( paramId ) );
+                // ホテルのフロントIPを取得
+                hapihoteIp = HotelIp.getFrontIp( Integer.parseInt( paramId ) );
+            }
+
+            if ( Integer.parseInt( paramId ) > 0 && Integer.parseInt( paramSeq ) > 0 && ret != false )
+            {
+                ret = hc.getData( Integer.parseInt( paramId ), Integer.parseInt( paramSeq ) );
+                if ( ret != false )
+                {
+                    // チェックインデータが正しくない場合
+                    if ( hc.getHotelCi().getCiStatus() == 1 )
+                    {
+                        errorCode = HapiTouchErrorMessage.ERR_30108;
+                        ret = false;
+                    }
+                    else if ( hc.getHotelCi().getCiStatus() == 2 )
+                    {
+                        errorCode = HapiTouchErrorMessage.ERR_30112;
+                        ret = false;
+                    }
+                    else if ( hc.getHotelCi().getCiStatus() == 3 )
+                    {
+                        errorCode = HapiTouchErrorMessage.ERR_30113;
+                        ret = false;
+                    }
+                }
+                // 部屋情報取得
+                dhrm.getData( Integer.parseInt( paramId ), hc.getHotelCi().getRoomNo() );
+                Logging.info( "id = " + paramId + ",seq=" + paramSeq + ",RoomNo=" + hc.getHotelCi().getRoomNo() + ",getRoomNameHost=" + dhrm.getRoomNameHost(), "ActionHtHome excute" );
+
+                // ホテル端末データ取得
+                ht.getHotelTerminal( Integer.parseInt( paramId ), dhrm.getSeq() );
+
+                // クーポンデータがあったらクーポン使用できないため、戻り値を逆にして取得
+                boolCouponAvailable = !(datc.getData( Integer.parseInt( paramId ), Integer.parseInt( paramSeq ) ));
+
+                userId = hc.getHotelCi().getUserId();
+                dub.getData( userId );
+
+                // 顧客を行っているかどうか
+                if ( dahs.getCustomFlag() > 0 )
+                {
+                    boolHotelCustom = true;
+                }
+                //
+                nonrefundableFlag = dahs.getNonrefundableFlag();
+
+                if ( ret != false )
+                {
+                    // ホストへ対してチェックインデータを送信
+                    if ( hapihoteIp.equals( "" ) == false )
+                    {
+
+                        if ( dhrm.getRoomNameHost().equals( "" ) == false )
+                        {
+
+                            /** （1000）ハピホテ_ハピホテタッチチェックイン電文 **/
+                            CheckIn ci = new CheckIn();
+                            ci.setSeq( hc.getHotelCi().getSeq() );
+                            ci.setRoomName( dhrm.getRoomNameHost() );
+                            // 保有マイル
+                            nowPoint = upp.getNowPoint( userId, false );
+                            ci.setNowPoint( nowPoint );
+
+                            if ( ci.sendToHost( Integer.parseInt( paramId ) ) != false )
+                            {
+                            }
+                            else
+                            {
+                                errorCode = ci.getErrorCode();
+                                ret = false;
+                            }
+
+                            if ( tc.getData( Integer.parseInt( paramId ), hc.getHotelCi().getSeq() ) != false )
+                            {
+
+                                if ( ci.getResult() == RESULT_OK )
+                                {
+                                    tc.getTouchCi().setHostNotification( RESULT_OK );
+                                    // ホスト連動フラグ
+                                    boolConnected = true;
+                                }
+                                else
+                                {
+                                    tc.getTouchCi().setHostNotification( RESULT_NG );
+                                    errorCode = ci.getErrorCode();
+                                    ret = false;
+                                    // if ( ci.getErrorCode() == 8023 && reTouch )// 会計中で再タッチの場合には無効にしない
+                                    if ( reTouch )// 再タッチの場合には無効にしない
+                                    {
+                                    }
+                                    else
+                                    {
+                                        tc.getTouchCi().setCiStatus( CI_STATUS_NOT_DISPLAY );
+                                    }
+                                }
+                                tc.getTouchCi().setLastUpdate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                                tc.getTouchCi().setLastUptime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                                tc.getTouchCi().updateData( tc.getTouchCi().getId(), tc.getTouchCi().getSeq() );
+                                tc.registHotelCi( tc.getTouchCi() );
+                            }
+                            else
+                            {
+                                if ( !reTouch )// 再タッチの場合には無効にしない
+                                {
+                                    hc.getHotelCi().setCiStatus( CI_STATUS_NOT_DISPLAY );
+                                }
+                                hc.getHotelCi().setLastUpdate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                                hc.getHotelCi().setLastUptime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                                hc.getHotelCi().updateData( Integer.parseInt( paramId ), hc.getHotelCi().getSeq(), hc.getHotelCi().getSubSeq() );
+                            }
+
+                        }
+                        else
+                        {
+
+                            // ホスト連動フラグ
+                            boolConnected = true;
+                            // 2015.03.22 タッチを受付たので、フロントのタッチ受付状況を取り下げる tashiro
+                            FrontTouchAcceptCheck ftac = new FrontTouchAcceptCheck();
+                            ftac.updateFrontTouchDisable( Integer.parseInt( paramId ) );
+                        }
+                    }
+                    else
+                    {
+                        // ホテルの接続先IPがないのでホテル顧客は非対応扱いにする
+                        boolHotelCustom = false;
+                        boolConnected = false;
+                        hapihoteIp = "";
+                    }
+                }
+            }
+            // チェックイン結果
+            if ( ret != false )
+            {
+                // メンバーIDが取れない場合はNGとしておく
+                if ( hc.getHotelCi().getUserId().equals( "" ) != false )
+                {
+                    ret = false;
+                    errorCode = HapiTouchErrorMessage.ERR_30102;
+                }
+            }
+            else
+            {
+                if ( errorCode == 0 )
+                {
+                    errorCode = HapiTouchErrorMessage.ERR_30117;
+
+                }
+            }
+            /** 予約来店と共通化 **/
+            TouchReception touchReception = new TouchReception();
+            if ( ret != false )
+            {
+                // タッチ接続
+                touchReception.getTouchReception( Integer.parseInt( paramId ), Integer.parseInt( paramSeq ), userId, hc,
+                        dhrm.getRoomNameHost(), boolHotelCustom, nonrefundableFlag );
+
+                boolUseableMile = touchReception.isBoolUseableMile();
+                unavailableMessage = touchReception.getUnavailableMessage();
+
+                boolMemberInfo = touchReception.isBoolMemberInfo();
+                customId = touchReception.getCustomId();
+                Logging.info( "ActionHtHome touchReception customId:" + customId + ",boolUseableMile:" + boolUseableMile );
+                securityCode = touchReception.getSecurityCode();
+                customRank = touchReception.getCustomRank();
+                point = touchReception.getPoint();
+                point2 = touchReception.getPoint2();
+                boolMemberCheckIn = touchReception.isBoolMemberCheckIn();
+
+                // エラーコードが既にセットされている場合、戻り値にエラーコードがセットされている場合のみセットする
+                if ( errorCode == 0 && touchReception.getErrorCode() > 0 )
+                {
+                    // if ( touchReception.getErrorCode() == 8023 && reTouch )
+                    // {
+                    // boolMemberCheckIn = true;
+                    // }
+                    // else
+                    // {
+                    errorCode = touchReception.getErrorCode();
+                    // }
+                }
+                apHotelCustomerData = touchReception.getApHotelCustomerData();
+                boolMemberAccept = touchReception.isBoolMemberAccept();
+                apCouponUnitList = touchReception.getApCouponUnitList();
+                boolMemberCardIssued = touchReception.isBoolMemberCardIssued();
+                goodsCode = touchReception.getGoodsCode();
+                goodsPrice = touchReception.getGoodsPrice();
+
+                /** 予約来店と共通化 **/
+            }
+            if ( errorCode != 0 && !UserAgent.isBot( request ) )
+            {
+                // エラー内容を登録
+                DataApErrorHistory daeh = new DataApErrorHistory();
+                daeh.setErrorCode( errorCode );
+                daeh.setErrorSub( 0 );
+                daeh.setHotelName( dhb.getName() );
+                daeh.setRoomName( dhrm.getRoomNameHost() );
+                daeh.setId( Integer.parseInt( paramId ) );
+                daeh.setRegistDate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                daeh.setRegistTime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                daeh.setTouchSeq( hc.getHotelCi().getSeq() );
+                daeh.setUserId( userId );
+                daeh.insertData();
+            }
+
+            apCommon = new DtoApCommon();
+            apCouponList = new DtoApCouponList();
+            apInquiry = new DtoApInquiryForm();
+            apHotelCustomer = new DtoApHotelCustomer();
+            apHotelCustomerData = new DtoApHotelCustomerData();
+            apUserInfo = new DtoApUserInfo();
+
+            // 共通設定
+            apCommon.setHtCheckIn( ret );
+            apCommon.setConnected( boolConnected );
+            apCommon.setId( Integer.parseInt( paramId ) );
+            apCommon.setHotelName( dhb.getName() );
+            apCommon.setRoomNo( dhrm.getRoomNameHost() );
+            apCommon.setSeq( hc.getHotelCi().getSeq() );
+            apCommon.setUseableMile( boolUseableMile );
+            apCommon.setUnavailableMessage( unavailableMessage );
+            apCommon.setErrorCode( errorCode );
+            apCommon.setCustomer( boolHotelCustom );
+
+            // クーポン設定
+            apCouponList.setApCommon( apCommon );
+            apCouponList.setApCouponUnit( apCouponUnitList );
+
+            // ホテル顧客
+            apHotelCustomer.setResultMemberInfo( boolMemberInfo );
+            apHotelCustomer.setResultMemberCard( boolMemberAccept );
+            apHotelCustomer.setResultMemberCheckIn( boolMemberCheckIn );
+            apHotelCustomer.setCustomId( customId );
+            apHotelCustomer.setRank( customRank );
+            apHotelCustomer.setPoint( point );
+            apHotelCustomer.setPoint2( point2 );
+            apHotelCustomer.setResultMemberCardIssued( boolMemberCardIssued );
+            apHotelCustomer.setGoodsCode( goodsCode );
+            apHotelCustomer.setGoodsPrice( goodsPrice );
+            apHotelCustomer.setErrorCode( errorCode );
+
+            apHotelCustomer.setApCommon( apCommon );
+
+            apUserInfo.setApCommon( apCommon );
+
+            request.setAttribute( "DtoApCommon", apCommon );
+            request.setAttribute( "DtoApCouponList", apCouponList );
+            request.setAttribute( "DtoApInquiryForm", apInquiry );
+            request.setAttribute( "DtoApHotelCustomer", apHotelCustomer );
+            request.setAttribute( "DtoApHotelCustomerData", apHotelCustomerData );
+            request.setAttribute( "DtoApUserInfo", apUserInfo );
+            request.setAttribute( "AVAILABLE_COUPON", Boolean.toString( boolCouponAvailable ) );
+
+            requestDispatcher = request.getRequestDispatcher( forwardUrl );
+            requestDispatcher.forward( request, response );
+
+        }
+        catch ( Exception exception )
+        {
+            Logging.error( "HtHome:" + exception );
+        }
+        finally
+        {
+        }
+    }
+}

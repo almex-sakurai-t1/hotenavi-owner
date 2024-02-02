@@ -1,0 +1,128 @@
+/* ‘Sƒy[ƒW‹¤’Ê */
+.midashi {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	text-decoration: none;
+	letter-spacing: 1px;
+	padding-left: 10px;
+}
+.midashi2 {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	text-decoration: none;
+	letter-spacing: 1px;
+	padding-left: 1px;
+	padding-top: 10px;
+	font-size: 12px;
+}
+.size16 {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 16px;
+	line-height: 140%;
+	text-decoration: none;
+	letter-spacing: 1px;
+	padding-left: 10px;
+}
+.size12 {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: none;
+	letter-spacing: 1px;
+	padding-left: 20px;
+	padding-top: 20px;
+}
+
+.honbun {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: none;
+	letter-spacing: 1px;
+	padding-left: 20px;
+}
+.size10 {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 10px;
+	line-height: 140%;
+	text-decoration: none;
+	letter-spacing: 1px;
+	padding-right: 5px;
+}
+a {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: none;
+}
+a:link {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: none;
+}
+a:visited {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: none;
+}
+a:hover {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: underline;
+}
+a:active {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: none;
+}
+.size121 {	
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: none;
+	letter-spacing: 1px;
+}
+
+a.link1 {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 160%;
+	color: #000000;
+	letter-spacing: 1px;
+	text-decoration: none;
+}
+a.link1:link {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 160%;
+	color: #000000;
+	letter-spacing: 1px;
+	text-decoration: none;
+}
+a.link1:visited {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 160%;
+	color: #000000;
+	letter-spacing: 1px;
+	text-decoration: none;
+}
+a.link1:hover {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 160%;
+	color: #000000;
+	letter-spacing: 1px;
+	text-decoration: underline;
+}@
+a.link1:active {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 160%;
+	color: #000000;
+	letter-spacing: 1px;
+	text-decoration: none;
+}

@@ -1,0 +1,402 @@
+/*
+ * @(#)SSTouchDecoder.java 1.00 2014/11/07 Copyright (C) ALMEX Inc. 2014 SSTouchDecoderクラス
+ */
+
+package jp.happyhotel.common;
+
+import java.io.FileInputStream;
+import java.io.Serializable;
+import java.util.Properties;
+
+import jp.pittouch.PTMini2Query;
+import jp.pittouch.PTMini2QueryResult;
+import jp.pittouch.PTNanoQuery;
+import jp.pittouch.PTNanoQueryResult;
+import jp.pittouch.PTNanoRTQuery;
+import jp.pittouch.PTNanoRTQueryResult;
+import jp.pittouch.SSTPTMini2Query;
+import jp.pittouch.SSTPTMini2QueryResult;
+import jp.pittouch.SSTPTNanoQuery;
+import jp.pittouch.SSTPTNanoQueryResult;
+import jp.pittouch.SSTPTNanoRTQuery;
+import jp.pittouch.SSTPTNanoRTQueryResult;
+
+public class SSTouchDecoder implements Serializable
+{
+    public final String       MINI_S           = "m2";
+    public final String       MINI_S_SST       = "n2";
+    public final String       NANO             = "f1";
+    public final String       NANO_SST         = "n5";
+    public final String       NANO_RT          = "f2";
+    public final String       NANO_RT_SST      = "n6";
+    public final int          KIND_NFC         = 1;
+    public final int          KIND_SSTOUCH     = 0;
+
+    /**
+     *
+     */
+    private static final long serialVersionUID = -5943851177137253405L;
+    private String            idm;
+    private String            termId;
+    private long              detectionCount;
+    private long              bootCount;
+    private long              timer;
+    private int               status;
+    private long              rtcTimer;
+    private long              totalDetctionCount;
+    private int               kind             = 0;
+    private String            key              = "";
+    private String            iv               = "";
+
+    public SSTouchDecoder()
+    {
+        this.idm = "";
+        this.termId = "";
+        this.detectionCount = 0;
+        this.bootCount = 0;
+        this.timer = 0;
+        this.status = 0;
+        this.rtcTimer = 0;
+        this.totalDetctionCount = 0;
+
+        try
+        {
+            Properties prop;
+            FileInputStream propfile = new FileInputStream( "/etc/happyhotel/sstouch.conf" );
+            prop = new Properties();
+            // ﾌﾟﾛﾊﾟﾃｨﾌｧｲﾙからｷｰと値のﾘｽﾄを読み込みます
+            prop.load( propfile );
+            // "jdbc.datasource"に設定されている値を取得します
+            key = prop.getProperty( "sstouch.key" );
+            iv = prop.getProperty( "sstouch.iv" );
+            prop = null;
+            propfile.close();
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[SSTouchDecoder.static()] Exception:" + e.toString() );
+        }
+    }
+
+    public String getIdm()
+    {
+        return idm;
+    }
+
+    public String getTermId()
+    {
+        return termId;
+    }
+
+    public long getDetectionCount()
+    {
+        return detectionCount;
+    }
+
+    public long getBootCount()
+    {
+        return bootCount;
+    }
+
+    public long getTimer()
+    {
+        return timer;
+    }
+
+    public int getStatus()
+    {
+        return status;
+    }
+
+    public long getRtcTimer()
+    {
+        return rtcTimer;
+    }
+
+    public long getTotalDetctionCount()
+    {
+        return totalDetctionCount;
+    }
+
+    public int getKind()
+    {
+        return kind;
+    }
+
+    public void setIdm(String idm)
+    {
+        this.idm = idm;
+    }
+
+    public void setTermId(String termId)
+    {
+        this.termId = termId;
+    }
+
+    public void setDetectionCount(long detectionCount)
+    {
+        this.detectionCount = detectionCount;
+    }
+
+    public void setBootCount(long bootCount)
+    {
+        this.bootCount = bootCount;
+    }
+
+    public void setTimer(long timer)
+    {
+        this.timer = timer;
+    }
+
+    public void setStatus(int status)
+    {
+        this.status = status;
+    }
+
+    public void setRtcTimer(long rtcTimer)
+    {
+        this.rtcTimer = rtcTimer;
+    }
+
+    public void setTotalDetctionCount(long totalDetctionCount)
+    {
+        this.totalDetctionCount = totalDetctionCount;
+    }
+
+    public void setKind(int kind)
+    {
+        this.kind = kind;
+    }
+
+    /**
+     * デコード
+     * 
+     * @param version
+     * @return
+     */
+    public boolean decode(String version, String paramX, String paramY)
+    {
+        boolean ret = false;
+
+        Logging.info( "version:" + version );
+        if ( version.equals( MINI_S ) != false )
+        {
+            ret = this.decodeMini( paramX, paramY );
+        }
+        else if ( version.equals( MINI_S_SST ) != false )
+        {
+            ret = this.decodeMiniSst( paramX, paramY );
+        }
+        else if ( version.equals( NANO ) != false )
+        {
+            ret = this.decodeNano( paramX );
+        }
+        else if ( version.equals( NANO_SST ) != false )
+        {
+            ret = this.decodeNanoSst( paramX, paramY );
+        }
+        else if ( version.equals( NANO_RT ) != false )
+        {
+            ret = this.decodeNanoRT( paramX );
+        }
+        else if ( version.equals( NANO_RT_SST ) != false )
+        {
+            ret = this.decodeNanoRTSst( paramX, paramY );
+        }
+        Logging.info( "termId:" + this.termId + ", rtcTimer:" + this.rtcTimer );
+
+        return ret;
+    }
+
+    /***
+     * MINIで三者間通信時のデコード
+     * 
+     * @param paramX
+     * @param paramY
+     * @return
+     */
+    public boolean decodeMini(String paramX, String paramY)
+    {
+        boolean ret = false;
+        try
+        {
+            PTMini2Query query = new PTMini2Query( paramX, paramY );
+            PTMini2QueryResult result = (PTMini2QueryResult)query.decode( key, iv );
+
+            this.idm = result.getIdm();
+            this.termId = result.getTerminalID();
+            this.bootCount = result.getStartupCount();
+            this.detectionCount = result.getDetectedCount();
+            this.status = result.getStatus();
+            this.timer = result.getTicktimer();
+            this.rtcTimer = result.getRtctimer();
+            this.totalDetctionCount = result.getTotalDetectedCount();
+            this.kind = KIND_NFC;
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[SSTouchDecoder.decodeMini()] Exception:" + e.toString() );
+        }
+        return ret;
+    }
+
+    /***
+     * MINIでSSTouch経由でのデコード
+     * 
+     * @param paramX
+     * @param paramY
+     * @return
+     */
+    public boolean decodeMiniSst(String paramX, String paramY)
+    {
+        boolean ret = false;
+        try
+        {
+            SSTPTMini2Query query = new SSTPTMini2Query( paramX, paramY );
+            SSTPTMini2QueryResult result = (SSTPTMini2QueryResult)query.decode( key, iv );
+
+            this.idm = result.getIdm();
+            this.termId = result.getTerminalID();
+            // this.bootCount = result.getStartupCount();
+            // this.detectionCount = result.getDetectedCount();
+            this.status = result.getStatus();
+            // this.timer = result.getTicktimer();
+            this.rtcTimer = result.getRtctimer();
+            this.kind = KIND_SSTOUCH;
+
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[SSTouchDecoder.decodeMiniSst()] Exception:" + e.toString() );
+        }
+        return ret;
+    }
+
+    /***
+     * NANOで三者間通信のデコード
+     * 
+     * @param paramX
+     * @return
+     */
+    public boolean decodeNano(String paramX)
+    {
+        boolean ret = false;
+        try
+        {
+            PTNanoQuery query = new PTNanoQuery( paramX );
+            PTNanoQueryResult result = (PTNanoQueryResult)query.decode( key, iv );
+
+            this.idm = result.getIdm();
+            this.termId = result.getTerminalID();
+            // this.bootCount = result.getStartupCount();
+            // this.detectionCount = result.getDetectedCount();
+            // this.status = result.getStatus();
+            this.timer = result.getTicktimer();
+            // this.rtcTimer = result.getRtctimer();
+            this.totalDetctionCount = result.getTotalDetectedCount();
+            this.kind = KIND_NFC;
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[SSTouchDecoder.decodeNano()] Exception:" + e.toString() );
+        }
+        return ret;
+    }
+
+    /***
+     * NANOでSSTouch経由でのデコード
+     * 
+     * @param paramX
+     * @return
+     */
+    public boolean decodeNanoSst(String paramX, String paramY)
+    {
+        boolean ret = false;
+        try
+        {
+            SSTPTNanoQuery query = new SSTPTNanoQuery( paramX, paramY );
+            SSTPTNanoQueryResult result = (SSTPTNanoQueryResult)query.decode( key, iv );
+
+            this.idm = result.getIdm();
+            this.termId = result.getTerminalID();
+            // this.bootCount = result.getStartupCount();
+            // this.detectionCount = result.getDetectedCount();
+            // this.status = result.getStatus();
+            // this.timer = result.getTicktimer();
+            // this.rtcTimer = result.getRtctimer();
+            this.totalDetctionCount = result.getTotalDetectedCount();
+            this.kind = KIND_SSTOUCH;
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[SSTouchDecoder.decodeNanoSst()] Exception:" + e.toString() );
+        }
+        return ret;
+    }
+
+    /***
+     * NANO-RTで三者間通信のデコード
+     * 
+     * @param paramX
+     * @return
+     */
+    public boolean decodeNanoRT(String paramX)
+    {
+        boolean ret = false;
+        try
+        {
+            PTNanoRTQuery query = new PTNanoRTQuery( paramX );
+            PTNanoRTQueryResult result = (PTNanoRTQueryResult)query.decode( key, iv );
+
+            this.idm = result.getIdm();
+            this.termId = result.getTerminalID();
+            // this.bootCount = result.getStartupCount();
+            // this.detectionCount = result.getDetectedCount();
+            // this.status = result.getStatus();
+            this.timer = result.getTicktimer();
+            this.rtcTimer = result.getRtctimer();
+            // this.totalDetctionCount = result.getTotalDetectedCount();
+            this.kind = KIND_NFC;
+
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[SSTouchDecoder.decodeNanoRT()] Exception:" + e.toString() );
+        }
+        return ret;
+    }
+
+    /***
+     * NANO-RTでSSTouch経由でのデコード
+     * 
+     * @param paramX
+     * @return
+     */
+    public boolean decodeNanoRTSst(String paramX, String paramY)
+    {
+        boolean ret = false;
+        try
+        {
+            SSTPTNanoRTQuery query = new SSTPTNanoRTQuery( paramX, paramY );
+            SSTPTNanoRTQueryResult result = (SSTPTNanoRTQueryResult)query.decode( key, iv );
+
+            if ( result.getIdm() != null )
+            {
+                this.idm = result.getIdm();
+            }
+            this.termId = result.getTerminalID();
+            // this.bootCount = result.getStartupCount();
+            // this.detectionCount = result.getDetectedCount();
+            // this.status = result.getStatus();
+            // this.timer = result.getTicktimer();
+            this.rtcTimer = result.getRtctimer();
+            // this.totalDetctionCount = result.getTotalDetectedCount();
+            this.kind = KIND_SSTOUCH;
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[SSTouchDecoder.decodeNanoRTSst()] Exception:" + e.toString() );
+        }
+        return ret;
+    }
+}

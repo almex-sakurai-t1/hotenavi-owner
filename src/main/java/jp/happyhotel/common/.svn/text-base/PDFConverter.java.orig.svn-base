@@ -1,0 +1,325 @@
+package jp.happyhotel.common;
+
+import java.io.BufferedInputStream;
+import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+
+import javax.servlet.ServletException;
+import javax.servlet.ServletOutputStream;
+import javax.servlet.http.HttpServletResponse;
+
+
+
+/*
+ * singleton class for converting excel doc to pdf
+ */
+public class PDFConverter {
+
+	private String tempFolder = "C:\\Temp\\";
+	private Counter counter ;
+	private static PDFConverter myself;
+	String pdfFileOutputLoc = "C:\\PDFs\\";	// PDF Creator server installation default pdf output dir
+	
+	private PDFConverter()
+	{
+		
+		deleteTempFiles(tempFolder);
+		deleteTempFiles(pdfFileOutputLoc);
+		counter = new Counter();
+	}
+	
+	private void deleteTempFiles(String folderPath)
+	{
+		File file = null;
+		File folder = new File(folderPath);
+		
+//		 create temp dir if it does not exist
+		if (!folder.exists()) {
+			folder.mkdirs();
+		}
+		// delete all files from the temp dir if exist
+		else {
+			String[] str = folder.list();
+			for (int i = 0; i < str.length; i++) {
+				file = new File(tempFolder + str[i]);
+				System.out.println(file.delete());
+			}
+		}
+		
+	}
+	public static synchronized PDFConverter getInstance()
+	{
+		if (myself == null)
+		{
+			myself = new PDFConverter();
+		}
+		
+		return myself;
+	}
+	/**
+	 * function to convert the sheet present in excel workbook  into pdf
+	 * 
+	 * @param xlsFileFullPathName absolute path of the excel file
+	 * @param sheetNum sheet number of the workbook to be converted into pdf (starting from 1)
+	 * @return location of the converted pdf file
+	 */
+	public  String convert(String xlsFileFullPathName, int sheetNum)
+	throws Exception
+	{
+		String pdfFileName=null;
+		File pdfFile;
+		String tempXLSFileName;
+		File tempXLSFile;
+		
+		long count;
+		// step 1: copy the xls file to temp folder
+		 
+		 System.out.println("filename : "+xlsFileFullPathName);
+		 count = counter.getCounter();
+		 System.out.println("Counter ->"+count);
+		 String outputFileName = xlsFileFullPathName.substring((xlsFileFullPathName.lastIndexOf("\\"))+1);
+		 tempXLSFileName = outputFileName+"."+count;
+		 
+		 copyToTemp(xlsFileFullPathName,tempFolder,tempXLSFileName);
+		 
+		 
+		 tempXLSFile = new File(tempFolder+tempXLSFileName);
+		 System.out.println(tempXLSFile.getName());
+		 System.out.println("Temporary xls file ->"+tempXLSFile.getAbsolutePath());
+		 
+		// step 2: convert the xls to pdf
+		 String execString = "wscript Convert2PDF.vbs "+tempXLSFile.getAbsolutePath()+ " "+sheetNum;
+		 System.out.println(execString);
+		 Runtime rt = Runtime.getRuntime();
+		 Process ps = rt.exec(execString);
+			
+		 
+		 pdfFileName = tempXLSFileName.substring(0, tempXLSFileName.indexOf("."));
+		 pdfFileName=pdfFileName+"."+count;
+		 pdfFile = new File(pdfFileOutputLoc+pdfFileName+".pdf");
+		 System.out.println(pdfFile.getAbsolutePath());
+			
+		// step 3: wait for the pdf file to be created
+		 int retryCount=0;
+		 long prev_lastmodifiedtime=0;
+		 long current_lastmodifiedtime=0;
+		while (true)
+		{
+		//	Thread.sleep(5000); 	
+			if (pdfFile.exists())
+			{
+				if ( prev_lastmodifiedtime !=0 )
+				{
+					current_lastmodifiedtime = pdfFile.lastModified();
+					
+					if ( current_lastmodifiedtime == prev_lastmodifiedtime)
+					{
+						break;
+					}
+				}
+				
+				prev_lastmodifiedtime = pdfFile.lastModified();
+				System.out.println(prev_lastmodifiedtime);
+				
+		}
+			
+			try{
+				System.out.println("going to sleep for "+retryCount+" times ->"+pdfFile.getName());
+				Thread.sleep(1000);
+			}catch(Exception ex){
+			//	System.out.println(" time out ");
+			}
+			retryCount++;
+			if (retryCount==100)
+			{
+					throw new Exception();
+			}
+			
+  		}
+		
+		// step 4: delete the xls from the temp folder
+		
+		deleteFile(tempXLSFile.getAbsolutePath());
+		return pdfFile.getAbsolutePath();
+	}
+	
+	/** Copies files from one source folder to another target folder (Temp)
+	 * 
+	 * @param inputFile the source file with absolute path
+	 * @param outputfile the destination file with absolute path
+	 */
+  private void copyToTemp(String inputFile,String outputFileLoc,String outputFileName)
+  throws Exception{
+    	 
+    	 String outputFile = outputFileLoc+outputFileName;
+    	 
+    	 FileInputStream fis = null; 
+         FileOutputStream fos = null; 
+         
+         FileChannel source = null;
+	     FileChannel target = null;
+         
+    	try{ 
+    	    File in = new File(inputFile);
+	        File out = new File(outputFile);
+	        
+	        fis  = new FileInputStream(in);
+	        fos = new FileOutputStream(out);
+	           	
+	      	source = fis.getChannel();
+	        target = fos.getChannel();
+	      	
+             
+	        source.transferTo(0, source.size(), target);
+	         
+    	}finally {
+         if (fis != null)          
+        	 fis.close();
+         if (source != null)
+        	 source.close();
+         if (fos != null)     
+        	 fos.close();
+         if (target != null)
+        	 target.close();
+        }
+
+     }       	
+	
+  /** writing files on output response stream
+   * @param pdf file location
+   * @param response stream
+   * 
+   */
+  
+  public void sendPDF(String PDFOutputFileLoc,HttpServletResponse response)throws Exception{
+	  
+	    File pdf1 =new File(PDFOutputFileLoc);
+	    String outputFileName = PDFOutputFileLoc.substring((PDFOutputFileLoc.lastIndexOf("\\"))+1);
+	    ServletOutputStream stream = null;
+	    BufferedInputStream buf = null;
+	    FileInputStream input = null;
+	    try {
+	      stream = response.getOutputStream();
+	      response.setContentType("application/pdf");
+	      response.addHeader("Content-Disposition", "inline; filename="+ outputFileName );
+	      //response.setHeader("Cache-Control", "private"); 
+	      response.setContentLength((int) pdf1.length());
+	      input = new FileInputStream(pdf1);
+	      buf = new BufferedInputStream(input);
+	      int readBytes = 0;
+	      
+
+	      while ((readBytes = buf.read()) != -1)
+	        stream.write(readBytes);
+	      System.out.println("PDFOutputFileLoc"+PDFOutputFileLoc);
+	     
+	      
+	    } catch (IOException ioe) {
+	    	 // System.out.println("PDFConverter............"+PDFOutputFileLoc);
+	    	  //System.out.println("Closing file ->"+PDFOutputFileLoc);
+
+	    	if( input != null ) {
+		    	input.close();
+	    	}
+	    	  deleteFile(PDFOutputFileLoc);
+	    	  throw new ServletException(ioe.getMessage());
+	    } finally {
+	      if (stream != null)
+	        stream.close();
+	      if (buf != null)
+	        buf.close();
+	      if ( input != null)
+	      {
+	    	//  System.out.println("Closing file ->"+PDFOutputFileLoc);
+	    	  input.close();
+	      }
+	      
+	     }
+	     
+   } 
+	 
+	/** delete files from specified location  
+	 * 
+	 *  @param file path
+	 */
+   public void deleteFile(String tempFilePath){
+  	 
+		File file=null; 
+		boolean isDeleted = false;
+		file = new File(tempFilePath);
+		System.out.println("deleting files : ");
+		if (file.exists()) {
+			
+			isDeleted = file.delete();
+			System.out.println("file "+tempFilePath+" deleted : "+isDeleted);
+			
+		 }
+
+
+		 
+	}
+}
+
+//	  
+//	/**
+//	 * @param args
+//	 */
+//	public static void main(String[] args) 
+//	{
+//		
+//		for (int i =0;i<1;i++)
+//			
+//		{
+//			try
+//			  {
+//				
+//			PDFConverter pdf = PDFConverter.getInstance();
+//			
+//			System.out.println(pdf.convert("C:\\happyhotel\\x-moon\\a20050301.xls", 3));
+//			
+//			  }
+//			  catch(Exception ex)
+//			  {
+//				  ex.printStackTrace();
+//			  }
+////			Thread t = new load();
+////			t.start();
+//		}
+//	}	
+//}
+//
+//class load extends Thread
+//{
+//	
+//	public void run()
+//	{
+//		try
+//		  {
+//			PDFConverter pdf = PDFConverter.getInstance();
+//			
+//			System.out.println(pdf.convert("Features.xls", 1));
+//			
+//		  }
+//		  catch(Exception ex)
+//		  {
+//			  ex.printStackTrace();
+//		  }
+//			
+//	}
+//}
+class Counter
+{
+	long count = 0;
+	
+	public synchronized long getCounter()
+	{
+		++count;
+		return count;
+	}
+}
+ 
+
+

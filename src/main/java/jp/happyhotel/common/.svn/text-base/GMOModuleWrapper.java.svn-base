@@ -1,0 +1,2327 @@
+package jp.happyhotel.common;
+
+import java.io.BufferedReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.security.KeyManagementException;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
+import java.security.cert.CertificateException;
+import java.security.cert.X509Certificate;
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
+
+import javax.net.ssl.HttpsURLConnection;
+import javax.net.ssl.SSLContext;
+import javax.net.ssl.SSLSocketFactory;
+import javax.net.ssl.X509TrustManager;
+
+import com.fasterxml.jackson.annotation.JsonProperty;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.DeserializationFeature;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.gmo_pg.g_pay.client.output.AlterTranOutput;
+import com.gmo_pg.g_pay.client.output.ChangeTranOutput;
+import com.gmo_pg.g_pay.client.output.DeleteCardOutput;
+import com.gmo_pg.g_pay.client.output.DeleteMemberOutput;
+import com.gmo_pg.g_pay.client.output.EntryTranOutput;
+import com.gmo_pg.g_pay.client.output.ErrHolder;
+import com.gmo_pg.g_pay.client.output.ExecTranOutput;
+import com.gmo_pg.g_pay.client.output.SaveCardOutput;
+import com.gmo_pg.g_pay.client.output.SaveMemberOutput;
+import com.gmo_pg.g_pay.client.output.SearchCardOutput;
+import com.gmo_pg.g_pay.client.output.SearchCardOutput.CardInfo;
+import com.gmo_pg.g_pay.client.output.SearchCardReverseOutput;
+import com.gmo_pg.g_pay.client.output.SearchCardReverseOutput.MemberCardInfo;
+import com.gmo_pg.g_pay.client.output.SearchMemberOutput;
+import com.gmo_pg.g_pay.client.output.SearchMemberOutput.MemberInfo;
+
+/**
+ * GMO Module Wrapper<br>
+ * <br>
+ * GMOとの通信をTLS1.2に対応させる必要があるとのことですが、<br>
+ * Java6では対応できないので、GMOのモジュールを操作する機能だけを新ホテナビのサーバ（Java8）に設置。<br>
+ * API経由で、Java6からでもGMO関連の処理を実行できるようにするという苦肉の策を決行。<br>
+ * <br>
+ * Paramクラスが2重に定義されていたり等々いろいろ問題はありますが、<br>
+ * ハピホテのJavaがバージョンアップするまでの暫定対応なため、とりあえず動かすことを最優先という感じで実装します。<br>
+ * 
+ * @author koshiba-y1
+ */
+public class GMOModuleWrapper
+{
+    /**
+     * SaveMember用入力パラメータ
+     * 
+     * @author koshiba-y1
+     */
+    public static class SaveMemberParam
+    {
+        /**
+         * サイトID
+         */
+        @JsonProperty("site_id")
+        private String siteId;
+
+        /**
+         * サイトパスワード
+         */
+        @JsonProperty("site_password")
+        private String sitePassword;
+
+        /**
+         * メンバーID
+         */
+        @JsonProperty("member_id")
+        private String memberId;
+
+        /**
+         * メンバー名
+         */
+        @JsonProperty("member_name")
+        private String memberName;
+
+        /**
+         * サイトIDのゲッター
+         * 
+         * @return サイトID
+         */
+        public String getSiteId()
+        {
+            return siteId;
+        }
+
+        /**
+         * サイトIDのセッター
+         * 
+         * @param siteId サイトID
+         */
+        public void setSiteId(String siteId)
+        {
+            this.siteId = siteId;
+        }
+
+        /**
+         * サイトパスワードのゲッター
+         * 
+         * @return サイトパスワード
+         */
+        public String getSitePassword()
+        {
+            return sitePassword;
+        }
+
+        /**
+         * サイトパスワードのセッター
+         * 
+         * @param sitePassword サイトパスワード
+         */
+        public void setSitePassword(String sitePassword)
+        {
+            this.sitePassword = sitePassword;
+        }
+
+        /**
+         * メンバーIDのゲッター
+         * 
+         * @return メンバーID
+         */
+        public String getMemberId()
+        {
+            return memberId;
+        }
+
+        /**
+         * メンバーIDのセッター
+         * 
+         * @param memberId メンバーID
+         */
+        public void setMemberId(String memberId)
+        {
+            this.memberId = memberId;
+        }
+
+        /**
+         * メンバー名のゲッター
+         * 
+         * @return メンバー名
+         */
+        public String getMemberName()
+        {
+            return memberName;
+        }
+
+        /**
+         * メンバー名のセッター
+         * 
+         * @param memberName メンバー名
+         */
+        public void setMemberName(String memberName)
+        {
+            this.memberName = memberName;
+        }
+    }
+
+    /**
+     * SearchMember用入力パラメータ
+     * 
+     * @author koshiba-y1
+     */
+    public static class SearchMemberParam
+    {
+        /**
+         * サイトID
+         */
+        @JsonProperty("site_id")
+        private String siteId;
+
+        /**
+         * サイトパスワード
+         */
+        @JsonProperty("site_password")
+        private String sitePassword;
+
+        /**
+         * メンバーID
+         */
+        @JsonProperty("member_id")
+        private String memberId;
+
+        /**
+         * サイトIDのゲッター
+         * 
+         * @return サイトID
+         */
+        public String getSiteId()
+        {
+            return siteId;
+        }
+
+        /**
+         * サイトIDのセッター
+         * 
+         * @param siteId サイトID
+         */
+        public void setSiteId(String siteId)
+        {
+            this.siteId = siteId;
+        }
+
+        /**
+         * サイトパスワードのゲッター
+         * 
+         * @return サイトパスワード
+         */
+        public String getSitePassword()
+        {
+            return sitePassword;
+        }
+
+        /**
+         * サイトパスワードのセッター
+         * 
+         * @param sitePassword サイトパスワード
+         */
+        public void setSitePassword(String sitePassword)
+        {
+            this.sitePassword = sitePassword;
+        }
+
+        /**
+         * メンバーIDのゲッター
+         * 
+         * @return メンバーID
+         */
+        public String getMemberId()
+        {
+            return memberId;
+        }
+
+        /**
+         * メンバーIDのセッター
+         * 
+         * @param memberId メンバーID
+         */
+        public void setMemberId(String memberId)
+        {
+            this.memberId = memberId;
+        }
+    }
+
+    /**
+     * DeleteMember用入力パラメータ
+     * 
+     * @author koshiba-y1
+     */
+    public static class DeleteMemberParam
+    {
+        /**
+         * サイトID
+         */
+        @JsonProperty("site_id")
+        private String siteId;
+
+        /**
+         * サイトパスワード
+         */
+        @JsonProperty("site_password")
+        private String sitePassword;
+
+        /**
+         * メンバーID
+         */
+        @JsonProperty("member_id")
+        private String memberId;
+
+        /**
+         * サイトIDのゲッター
+         * 
+         * @return サイトID
+         */
+        public String getSiteId()
+        {
+            return siteId;
+        }
+
+        /**
+         * サイトIDのセッター
+         * 
+         * @param siteId サイトID
+         */
+        public void setSiteId(String siteId)
+        {
+            this.siteId = siteId;
+        }
+
+        /**
+         * サイトパスワードのゲッター
+         * 
+         * @return サイトパスワード
+         */
+        public String getSitePassword()
+        {
+            return sitePassword;
+        }
+
+        /**
+         * サイトパスワードのセッター
+         * 
+         * @param sitePassword サイトパスワード
+         */
+        public void setSitePassword(String sitePassword)
+        {
+            this.sitePassword = sitePassword;
+        }
+
+        /**
+         * メンバーIDのゲッター
+         * 
+         * @return メンバーID
+         */
+        public String getMemberId()
+        {
+            return memberId;
+        }
+
+        /**
+         * メンバーIDのセッター
+         * 
+         * @param memberId メンバーID
+         */
+        public void setMemberId(String memberId)
+        {
+            this.memberId = memberId;
+        }
+    }
+
+    /**
+     * SaveCard用入力パラメータ
+     * 
+     * @author koshiba-y1
+     */
+    public static class SaveCardParam
+    {
+        /**
+         * サイトID
+         */
+        @JsonProperty("site_id")
+        private String  siteId;
+
+        /**
+         * サイトパスワード
+         */
+        @JsonProperty("site_password")
+        private String  sitePassword;
+
+        /**
+         * メンバーID
+         */
+        @JsonProperty("member_id")
+        private String  memberId;
+
+        /**
+         * モード
+         */
+        @JsonProperty("mode")
+        private String  mode;
+
+        /**
+         * 登録フラグ<br>
+         * <br>
+         * {@code true}: 登録<br>
+         * {@code false}: 更新<br>
+         */
+        @JsonProperty("insert_flag")
+        private boolean insertFlag = true;
+
+        /**
+         * カードシーケンス番号<br>
+         * <br>
+         * 登録フラグ（{@code insertFlag}）が{@code false}の場合に指定。<br>
+         */
+        @JsonProperty("card_seq")
+        private Integer cardSeq;
+
+        /**
+         * トークン
+         */
+        @JsonProperty("token")
+        private String  token;
+
+        /**
+         * カード番号<br>
+         * <br>
+         * トークン（{@code token}）が設定されていない場合に指定。<br>
+         */
+        @JsonProperty("card_no")
+        private String  cardNo;
+
+        /**
+         * カード有効期限<br>
+         * <br>
+         * トークン（{@code token}）が設定されていない場合に指定。<br>
+         */
+        @JsonProperty("expire")
+        private String  expire;
+
+        /**
+         * サイトIDのゲッター
+         * 
+         * @return サイトID
+         */
+        public String getSiteId()
+        {
+            return siteId;
+        }
+
+        /**
+         * サイトIDのセッター
+         * 
+         * @param siteId サイトID
+         */
+        public void setSiteId(String siteId)
+        {
+            this.siteId = siteId;
+        }
+
+        /**
+         * サイトパスワードのゲッター
+         * 
+         * @return サイトパスワード
+         */
+        public String getSitePassword()
+        {
+            return sitePassword;
+        }
+
+        /**
+         * サイトパスワードのセッター
+         * 
+         * @param sitePassword サイトパスワード
+         */
+        public void setSitePassword(String sitePassword)
+        {
+            this.sitePassword = sitePassword;
+        }
+
+        /**
+         * メンバーIDのゲッター
+         * 
+         * @return メンバーID
+         */
+        public String getMemberId()
+        {
+            return memberId;
+        }
+
+        /**
+         * メンバーIDのセッター
+         * 
+         * @param memberId メンバーID
+         */
+        public void setMemberId(String memberId)
+        {
+            this.memberId = memberId;
+        }
+
+        /**
+         * モードのゲッター
+         * 
+         * @return モード
+         */
+        public String getMode()
+        {
+            return mode;
+        }
+
+        /**
+         * モードのセッター
+         * 
+         * @param mode モード
+         */
+        public void setMode(String mode)
+        {
+            this.mode = mode;
+        }
+
+        /**
+         * 登録フラグのゲッター
+         * 
+         * @return 登録フラグ
+         */
+        public boolean getInsertFlag()
+        {
+            return insertFlag;
+        }
+
+        /**
+         * 登録フラグのセッター
+         * 
+         * @param insertFlag 登録フラグ
+         */
+        public void setInsertFlag(boolean insertFlag)
+        {
+            this.insertFlag = insertFlag;
+        }
+
+        /**
+         * カードシーケンス番号のゲッター
+         * 
+         * @return カードシーケンス番号
+         */
+        public Integer getCardSeq()
+        {
+            return cardSeq;
+        }
+
+        /**
+         * カードシーケンス番号のセッター
+         * 
+         * @param cardSeq カードシーケンス番号
+         */
+        public void setCardSeq(Integer cardSeq)
+        {
+            this.cardSeq = cardSeq;
+        }
+
+        /**
+         * トークンのゲッター
+         * 
+         * @return トークン
+         */
+        public String getToken()
+        {
+            return token;
+        }
+
+        /**
+         * トークンのセッター
+         * 
+         * @param token トークン
+         */
+        public void setToken(String token)
+        {
+            this.token = token;
+        }
+
+        /**
+         * カード番号のゲッター
+         * 
+         * @return カード番号
+         */
+        public String getCardNo()
+        {
+            return cardNo;
+        }
+
+        /**
+         * カード番号のセッター
+         * 
+         * @param cardNo カード番号
+         */
+        public void setCardNo(String cardNo)
+        {
+            this.cardNo = cardNo;
+        }
+
+        /**
+         * カード有効期限のゲッター
+         * 
+         * @return カード有効期限
+         */
+        public String getExpire()
+        {
+            return expire;
+        }
+
+        /**
+         * カード有効期限のセッター
+         * 
+         * @param expire カード有効期限
+         */
+        public void setExpire(String expire)
+        {
+            this.expire = expire;
+        }
+    }
+
+    /**
+     * SearchCard用入力パラメータ
+     * 
+     * @author koshiba-y1
+     */
+    public static class SearchCardParam
+    {
+        /**
+         * サイトID
+         */
+        @JsonProperty("site_id")
+        private String  siteId;
+
+        /**
+         * サイトパスワード
+         */
+        @JsonProperty("site_password")
+        private String  sitePassword;
+
+        /**
+         * メンバーID
+         */
+        @JsonProperty("member_id")
+        private String  memberId;
+
+        /**
+         * モード
+         */
+        @JsonProperty("mode")
+        private String  mode;
+
+        /**
+         * カードシーケンス番号<br>
+         * <br>
+         * モード（{@code mode}）が{@code "0"}以外の場合に指定。<br>
+         */
+        @JsonProperty("card_seq")
+        private Integer cardSeq;
+
+        /**
+         * サイトIDのゲッター
+         * 
+         * @return サイトID
+         */
+        public String getSiteId()
+        {
+            return siteId;
+        }
+
+        /**
+         * サイトIDのセッター
+         * 
+         * @param siteId サイトID
+         */
+        public void setSiteId(String siteId)
+        {
+            this.siteId = siteId;
+        }
+
+        /**
+         * サイトパスワードのゲッター
+         * 
+         * @return サイトパスワード
+         */
+        public String getSitePassword()
+        {
+            return sitePassword;
+        }
+
+        /**
+         * サイトパスワードのセッター
+         * 
+         * @param sitePassword サイトパスワード
+         */
+        public void setSitePassword(String sitePassword)
+        {
+            this.sitePassword = sitePassword;
+        }
+
+        /**
+         * メンバーIDのゲッター
+         * 
+         * @return メンバーID
+         */
+        public String getMemberId()
+        {
+            return memberId;
+        }
+
+        /**
+         * メンバーIDのセッター
+         * 
+         * @param memberId メンバーID
+         */
+        public void setMemberId(String memberId)
+        {
+            this.memberId = memberId;
+        }
+
+        /**
+         * モードのゲッター
+         * 
+         * @return モード
+         */
+        public String getMode()
+        {
+            return mode;
+        }
+
+        /**
+         * モードのセッター
+         * 
+         * @param mode モード
+         */
+        public void setMode(String mode)
+        {
+            this.mode = mode;
+        }
+
+        /**
+         * カードシーケンス番号のゲッター
+         * 
+         * @return カードシーケンス番号
+         */
+        public Integer getCardSeq()
+        {
+            return cardSeq;
+        }
+
+        /**
+         * カードシーケンス番号のセッター
+         * 
+         * @param cardSeq カードシーケンス番号
+         */
+        public void setCardSeq(Integer cardSeq)
+        {
+            this.cardSeq = cardSeq;
+        }
+    }
+
+    /**
+     * DeleteCard用入力パラメータ
+     * 
+     * @author koshiba-y1
+     */
+    public static class DeleteCardParam
+    {
+        /**
+         * サイトID
+         */
+        @JsonProperty("site_id")
+        private String  siteId;
+
+        /**
+         * サイトパスワード
+         */
+        @JsonProperty("site_password")
+        private String  sitePassword;
+
+        /**
+         * メンバーID
+         */
+        @JsonProperty("member_id")
+        private String  memberId;
+
+        /**
+         * モード
+         */
+        @JsonProperty("mode")
+        private String  mode;
+
+        /**
+         * カードシーケンス番号
+         */
+        @JsonProperty("card_seq")
+        private Integer cardSeq;
+
+        /**
+         * サイトIDのゲッター
+         * 
+         * @return サイトID
+         */
+        public String getSiteId()
+        {
+            return siteId;
+        }
+
+        /**
+         * サイトIDのセッター
+         * 
+         * @param siteId サイトID
+         */
+        public void setSiteId(String siteId)
+        {
+            this.siteId = siteId;
+        }
+
+        /**
+         * サイトパスワードのゲッター
+         * 
+         * @return サイトパスワード
+         */
+        public String getSitePassword()
+        {
+            return sitePassword;
+        }
+
+        /**
+         * サイトパスワードのセッター
+         * 
+         * @param sitePassword サイトパスワード
+         */
+        public void setSitePassword(String sitePassword)
+        {
+            this.sitePassword = sitePassword;
+        }
+
+        /**
+         * メンバーIDのゲッター
+         * 
+         * @return メンバーID
+         */
+        public String getMemberId()
+        {
+            return memberId;
+        }
+
+        /**
+         * メンバーIDのセッター
+         * 
+         * @param memberId メンバーID
+         */
+        public void setMemberId(String memberId)
+        {
+            this.memberId = memberId;
+        }
+
+        /**
+         * モードのゲッター
+         * 
+         * @return モード
+         */
+        public String getMode()
+        {
+            return mode;
+        }
+
+        /**
+         * モードのセッター
+         * 
+         * @param mode モード
+         */
+        public void setMode(String mode)
+        {
+            this.mode = mode;
+        }
+
+        /**
+         * カードシーケンス番号のゲッター
+         * 
+         * @return カードシーケンス番号
+         */
+        public Integer getCardSeq()
+        {
+            return cardSeq;
+        }
+
+        /**
+         * カードシーケンス番号のセッター
+         * 
+         * @param cardSeq カードシーケンス番号
+         */
+        public void setCardSeq(Integer cardSeq)
+        {
+            this.cardSeq = cardSeq;
+        }
+    }
+
+    /**
+     * AlterTran用入力パラメータ
+     * 
+     * @author koshiba-y1
+     */
+    public static class AlterTranParam
+    {
+        /**
+         * ショップID
+         */
+        @JsonProperty("shop_id")
+        private String shopId;
+
+        /**
+         * ショップパスワード
+         */
+        @JsonProperty("shop_password")
+        private String shopPassword;
+
+        /**
+         * アクセスID
+         */
+        @JsonProperty("access_id")
+        private String accessId;
+
+        /**
+         * アクセスパスワード
+         */
+        @JsonProperty("access_password")
+        private String accessPassword;
+
+        /**
+         * ジョブコード<br>
+         * <br>
+         * {@code "SALES"}: 実売上<br>
+         * {@code "VOID"}: 取り消し<br>
+         */
+        @JsonProperty("job_code")
+        private String jobCode;
+
+        /**
+         * 金額
+         */
+        @JsonProperty("amount")
+        private int    amount;
+
+        /**
+         * ショップIDのゲッター
+         * 
+         * @return ショップID
+         */
+        public String getShopId()
+        {
+            return shopId;
+        }
+
+        /**
+         * ショップIDのセッター
+         * 
+         * @param shopId ショップID
+         */
+        public void setShopId(String shopId)
+        {
+            this.shopId = shopId;
+        }
+
+        /**
+         * ショップパスワードのゲッター
+         * 
+         * @return ショップパスワード
+         */
+        public String getShopPassword()
+        {
+            return shopPassword;
+        }
+
+        /**
+         * ショップパスワードのセッター
+         * 
+         * @param shopPassword ショップパスワード
+         */
+        public void setShopPassword(String shopPassword)
+        {
+            this.shopPassword = shopPassword;
+        }
+
+        /**
+         * アクセスIDのゲッター
+         * 
+         * @return アクセスID
+         */
+        public String getAccessId()
+        {
+            return accessId;
+        }
+
+        /**
+         * アクセスIDのセッター
+         * 
+         * @param accessId アクセスID
+         */
+        public void setAccessId(String accessId)
+        {
+            this.accessId = accessId;
+        }
+
+        /**
+         * アクセスパスワードのゲッター
+         * 
+         * @return アクセスパスワード
+         */
+        public String getAccessPassword()
+        {
+            return accessPassword;
+        }
+
+        /**
+         * アクセスパスワードのセッター
+         * 
+         * @param accessPassword アクセスパスワード
+         */
+        public void setAccessPassword(String accessPassword)
+        {
+            this.accessPassword = accessPassword;
+        }
+
+        /**
+         * ジョブコードのゲッター
+         * 
+         * @return ジョブコード
+         */
+        public String getJobCode()
+        {
+            return jobCode;
+        }
+
+        /**
+         * ジョブコードのセッター
+         * 
+         * @param jobCode ジョブコード
+         */
+        public void setJobCode(String jobCode)
+        {
+            this.jobCode = jobCode;
+        }
+
+        /**
+         * 金額のゲッター
+         * 
+         * @return 金額
+         */
+        public int getAmount()
+        {
+            return amount;
+        }
+
+        /**
+         * 金額のセッター
+         * 
+         * @param amount 金額
+         */
+        public void setAmount(int amount)
+        {
+            this.amount = amount;
+        }
+    }
+
+    /**
+     * ChangeTran用入力パラメータ
+     * 
+     * @author koshiba-y1
+     */
+    public static class ChangeTranParam
+    {
+        /**
+         * ショップID
+         */
+        @JsonProperty("shop_id")
+        private String shopId;
+
+        /**
+         * ショップパスワード
+         */
+        @JsonProperty("shop_password")
+        private String shopPassword;
+
+        /**
+         * アクセスID
+         */
+        @JsonProperty("access_id")
+        private String accessId;
+
+        /**
+         * アクセスパスワード
+         */
+        @JsonProperty("access_password")
+        private String accessPassword;
+
+        /**
+         * ジョブコード<br>
+         * <br>
+         * {@code "CAPTURE"}: 即時売上<br>
+         */
+        @JsonProperty("job_code")
+        private String jobCode;
+
+        /**
+         * 金額
+         */
+        @JsonProperty("amount")
+        private int    amount;
+
+        /**
+         * ショップIDのゲッター
+         * 
+         * @return ショップID
+         */
+        public String getShopId()
+        {
+            return shopId;
+        }
+
+        /**
+         * ショップIDのセッター
+         * 
+         * @param shopId ショップID
+         */
+        public void setShopId(String shopId)
+        {
+            this.shopId = shopId;
+        }
+
+        /**
+         * ショップパスワードのゲッター
+         * 
+         * @return ショップパスワード
+         */
+        public String getShopPassword()
+        {
+            return shopPassword;
+        }
+
+        /**
+         * ショップパスワードのセッター
+         * 
+         * @param shopPassword ショップパスワード
+         */
+        public void setShopPassword(String shopPassword)
+        {
+            this.shopPassword = shopPassword;
+        }
+
+        /**
+         * アクセスIDのゲッター
+         * 
+         * @return アクセスID
+         */
+        public String getAccessId()
+        {
+            return accessId;
+        }
+
+        /**
+         * アクセスIDのセッター
+         * 
+         * @param accessId アクセスID
+         */
+        public void setAccessId(String accessId)
+        {
+            this.accessId = accessId;
+        }
+
+        /**
+         * アクセスパスワードのゲッター
+         * 
+         * @return アクセスパスワード
+         */
+        public String getAccessPassword()
+        {
+            return accessPassword;
+        }
+
+        /**
+         * アクセスパスワードのセッター
+         * 
+         * @param accessPassword アクセスパスワード
+         */
+        public void setAccessPassword(String accessPassword)
+        {
+            this.accessPassword = accessPassword;
+        }
+
+        /**
+         * ジョブコードのゲッター
+         * 
+         * @return ジョブコード
+         */
+        public String getJobCode()
+        {
+            return jobCode;
+        }
+
+        /**
+         * ジョブコードのセッター
+         * 
+         * @param jobCode ジョブコード
+         */
+        public void setJobCode(String jobCode)
+        {
+            this.jobCode = jobCode;
+        }
+
+        /**
+         * 金額のゲッター
+         * 
+         * @return 金額
+         */
+        public int getAmount()
+        {
+            return amount;
+        }
+
+        /**
+         * 金額のセッター
+         * 
+         * @param amount 金額
+         */
+        public void setAmount(int amount)
+        {
+            this.amount = amount;
+        }
+    }
+
+    /**
+     * EntryTran用入力パラメータ
+     * 
+     * @author koshiba-y1
+     */
+    public static class EntryTranParam
+    {
+        /**
+         * ショップID
+         */
+        @JsonProperty("shop_id")
+        private String shopId;
+
+        /**
+         * ショップパスワード
+         */
+        @JsonProperty("shop_password")
+        private String shopPassword;
+
+        /**
+         * オーダーID
+         */
+        @JsonProperty("order_id")
+        private String orderId;
+
+        /**
+         * ジョブコード<br>
+         * <br>
+         * {@code "AUTH"}: オーソリ<br>
+         * {@code "CHECK"}: チェック<br>
+         */
+        @JsonProperty("job_code")
+        private String jobCode;
+
+        /**
+         * 金額
+         */
+        @JsonProperty("amount")
+        private int    amount;
+
+        /**
+         * ショップIDのゲッター
+         * 
+         * @return ショップID
+         */
+        public String getShopId()
+        {
+            return shopId;
+        }
+
+        /**
+         * ショップIDのセッター
+         * 
+         * @param shopId ショップID
+         */
+        public void setShopId(String shopId)
+        {
+            this.shopId = shopId;
+        }
+
+        /**
+         * ショップパスワードのゲッター
+         * 
+         * @return ショップパスワード
+         */
+        public String getShopPassword()
+        {
+            return shopPassword;
+        }
+
+        /**
+         * ショップパスワードのセッター
+         * 
+         * @param shopPassword ショップパスワード
+         */
+        public void setShopPassword(String shopPassword)
+        {
+            this.shopPassword = shopPassword;
+        }
+
+        /**
+         * オーダーIDのゲッター
+         * 
+         * @return オーダーID
+         */
+        public String getOrderId()
+        {
+            return orderId;
+        }
+
+        /**
+         * オーダーIDのセッター
+         * 
+         * @param orderId オーダーID
+         */
+        public void setOrderId(String orderId)
+        {
+            this.orderId = orderId;
+        }
+
+        /**
+         * ジョブコードのゲッター
+         * 
+         * @return ジョブコード
+         */
+        public String getJobCode()
+        {
+            return jobCode;
+        }
+
+        /**
+         * ジョブコードのセッター
+         * 
+         * @param jobCode ジョブコード
+         */
+        public void setJobCode(String jobCode)
+        {
+            this.jobCode = jobCode;
+        }
+
+        /**
+         * 金額のゲッター
+         * 
+         * @return 金額
+         */
+        public int getAmount()
+        {
+            return amount;
+        }
+
+        /**
+         * 金額のセッター
+         * 
+         * @param amount 金額
+         */
+        public void setAmount(int amount)
+        {
+            this.amount = amount;
+        }
+    }
+
+    /**
+     * ExecTran用入力パラメータ
+     * 
+     * @author koshiba-y1
+     */
+    public static class ExecTranParam
+    {
+        /**
+         * アクセスID
+         */
+        @JsonProperty("access_id")
+        private String  accessId;
+
+        /**
+         * アクセスパスワード
+         */
+        @JsonProperty("access_password")
+        private String  accessPassword;
+
+        /**
+         * オーダーID
+         */
+        @JsonProperty("order_id")
+        private String  orderId;
+
+        /**
+         * メソッド
+         */
+        @JsonProperty("method")
+        private String  method;
+
+        /**
+         * トークン
+         */
+        @JsonProperty("token")
+        private String  token;
+
+        /**
+         * サイトID
+         */
+        @JsonProperty("site_id")
+        private String  siteId;
+
+        /**
+         * サイトパスワード
+         */
+        @JsonProperty("site_password")
+        private String  sitePassword;
+
+        /**
+         * メンバーID
+         */
+        @JsonProperty("member_id")
+        private String  memberId;
+
+        /**
+         * カードシーケンス番号
+         */
+        @JsonProperty("card_seq")
+        private Integer cardSeq;
+
+        /**
+         * カード番号
+         */
+        @JsonProperty("card_no")
+        private String  cardNo;
+
+        /**
+         * カード有効期限
+         */
+        @JsonProperty("expire")
+        private String  expire;
+
+        /**
+         * カードセキュリティコード
+         */
+        @JsonProperty("security_code")
+        private String  securityCode;
+
+        /**
+         * アクセスIDのゲッター
+         * 
+         * @return アクセスID
+         */
+        public String getAccessId()
+        {
+            return accessId;
+        }
+
+        /**
+         * アクセスIDのセッター
+         * 
+         * @param accessId アクセスID
+         */
+        public void setAccessId(String accessId)
+        {
+            this.accessId = accessId;
+        }
+
+        /**
+         * アクセスパスワードのゲッター
+         * 
+         * @return アクセスパスワード
+         */
+        public String getAccessPassword()
+        {
+            return accessPassword;
+        }
+
+        /**
+         * アクセスパスワードのセッター
+         * 
+         * @param accessPassword アクセスパスワード
+         */
+        public void setAccessPassword(String accessPassword)
+        {
+            this.accessPassword = accessPassword;
+        }
+
+        /**
+         * オーダーIDのゲッター
+         * 
+         * @return オーダーID
+         */
+        public String getOrderId()
+        {
+            return orderId;
+        }
+
+        /**
+         * オーダーIDのセッター
+         * 
+         * @param orderId オーダーID
+         */
+        public void setOrderId(String orderId)
+        {
+            this.orderId = orderId;
+        }
+
+        /**
+         * メソッドのゲッター
+         * 
+         * @return メソッド
+         */
+        public String getMethod()
+        {
+            return method;
+        }
+
+        /**
+         * メソッドのセッター
+         * 
+         * @param method メソッド
+         */
+        public void setMethod(String method)
+        {
+            this.method = method;
+        }
+
+        /**
+         * トークンのゲッター
+         * 
+         * @return トークン
+         */
+        public String getToken()
+        {
+            return token;
+        }
+
+        /**
+         * トークンのセッター
+         * 
+         * @param token トークン
+         */
+        public void setToken(String token)
+        {
+            this.token = token;
+        }
+
+        /**
+         * サイトIDのゲッター
+         * 
+         * @return サイトID
+         */
+        public String getSiteId()
+        {
+            return siteId;
+        }
+
+        /**
+         * サイトIDのセッター
+         * 
+         * @param siteId サイトID
+         */
+        public void setSiteId(String siteId)
+        {
+            this.siteId = siteId;
+        }
+
+        /**
+         * サイトパスワードのゲッター
+         * 
+         * @return サイトパスワード
+         */
+        public String getSitePassword()
+        {
+            return sitePassword;
+        }
+
+        /**
+         * サイトパスワードのセッター
+         * 
+         * @param sitePassword サイトパスワード
+         */
+        public void setSitePassword(String sitePassword)
+        {
+            this.sitePassword = sitePassword;
+        }
+
+        /**
+         * メンバーIDのゲッター
+         * 
+         * @return メンバーID
+         */
+        public String getMemberId()
+        {
+            return memberId;
+        }
+
+        /**
+         * メンバーIDのセッター
+         * 
+         * @param memberId メンバーID
+         */
+        public void setMemberId(String memberId)
+        {
+            this.memberId = memberId;
+        }
+
+        /**
+         * カードシーケンス番号のゲッター
+         * 
+         * @return カードシーケンス番号
+         */
+        public Integer getCardSeq()
+        {
+            return cardSeq;
+        }
+
+        /**
+         * カードシーケンス番号のセッター
+         * 
+         * @param cardSeq カードシーケンス番号
+         */
+        public void setCardSeq(Integer cardSeq)
+        {
+            this.cardSeq = cardSeq;
+        }
+
+        /**
+         * カード番号のゲッター
+         * 
+         * @return カード番号
+         */
+        public String getCardNo()
+        {
+            return cardNo;
+        }
+
+        /**
+         * カード番号のセッター
+         * 
+         * @param cardNo カード番号
+         */
+        public void setCardNo(String cardNo)
+        {
+            this.cardNo = cardNo;
+        }
+
+        /**
+         * カード有効期限のゲッター
+         * 
+         * @return カード有効期限
+         */
+        public String getExpire()
+        {
+            return expire;
+        }
+
+        /**
+         * カード有効期限のセッター
+         * 
+         * @param expire カード有効期限
+         */
+        public void setExpire(String expire)
+        {
+            this.expire = expire;
+        }
+
+        /**
+         * カードセキュリティコードのゲッター
+         * 
+         * @return カードセキュリティコード
+         */
+        public String getSecurityCode()
+        {
+            return securityCode;
+        }
+
+        /**
+         * カードセキュリティコードのセッター
+         * 
+         * @param securityCode カードセキュリティコード
+         */
+        public void setSecurityCode(String securityCode)
+        {
+            this.securityCode = securityCode;
+        }
+    }
+
+    /**
+     * SearchCardReverse用入力パラメータ
+     * 
+     * @author koshiba-y1
+     */
+    public static class SearchCardReverseParam
+    {
+        /**
+         * サイトID
+         */
+        @JsonProperty("site_id")
+        private String siteId;
+
+        /**
+         * サイトパスワード
+         */
+        @JsonProperty("site_password")
+        private String sitePassword;
+
+        /**
+         * トークン
+         */
+        @JsonProperty("token")
+        private String token;
+
+        /**
+         * サイトIDのゲッター
+         * 
+         * @return サイトID
+         */
+        public String getSiteId()
+        {
+            return siteId;
+        }
+
+        /**
+         * サイトIDのセッター
+         * 
+         * @param siteId サイトID
+         */
+        public void setSiteId(String siteId)
+        {
+            this.siteId = siteId;
+        }
+
+        /**
+         * サイトパスワードのゲッター
+         * 
+         * @return サイトパスワード
+         */
+        public String getSitePassword()
+        {
+            return sitePassword;
+        }
+
+        /**
+         * サイトパスワードのセッター
+         * 
+         * @param sitePassword サイトパスワード
+         */
+        public void setSitePassword(String sitePassword)
+        {
+            this.sitePassword = sitePassword;
+        }
+
+        /**
+         * トークンのゲッター
+         * 
+         * @return トークン
+         */
+        public String getToken()
+        {
+            return token;
+        }
+
+        /**
+         * トークンのセッター
+         * 
+         * @param token トークン
+         */
+        public void setToken(String token)
+        {
+            this.token = token;
+        }
+    }
+
+    /**
+     * 会員登録<br>
+     * <br>
+     * サイトで管理する会員を登録します。<br>
+     * 
+     * @param param パラメータ
+     * @throws IOException サーバに接続できなかった場合
+     * @return {@code SaveMemberOutput}オブジェクト
+     */
+    public static SaveMemberOutput saveMember(SaveMemberParam param) throws IOException
+    {
+        String paramJson = objectToJson( param );
+        String apiUrl = readGmoApiUrl() + "/SaveMember";
+        String retJson = sslPostRequest( apiUrl, paramJson );
+        SaveMemberOutput output = jsonToObject( retJson, SaveMemberOutput.class );
+
+        // errListがLinkedHashMapを格納したリストになっているため、ErrHolderを格納したリストに変換する
+        output.setErrList( convertObjects( output.getErrList(), ErrHolder.class ) );
+
+        return output;
+    }
+
+    /**
+     * 会員照会<br>
+     * <br>
+     * サイトで管理されている会員を照会します。<br>
+     * 
+     * @param param パラメータ
+     * @throws IOException サーバに接続できなかった場合
+     * @return {@code SearchMemberOutput}オブジェクト
+     */
+    public static SearchMemberOutput searchMember(SearchMemberParam param) throws IOException
+    {
+        String paramJson = objectToJson( param );
+        String apiUrl = readGmoApiUrl() + "/SearchMember";
+        String retJson = sslPostRequest( apiUrl, paramJson );
+        SearchMemberOutput output = jsonToObject( retJson, SearchMemberOutput.class );
+
+        // errListがLinkedHashMapを格納したリストになっているため、ErrHolderを格納したリストに変換する
+        output.setErrList( convertObjects( output.getErrList(), ErrHolder.class ) );
+
+        // memberListもLinkedHashMapを格納したリストになっているが、
+        // MemberInfoがSearchMemberOutput内の非staticなインナークラスというナゾ仕様なため、Jacksonで変換しようとすると落ちる。
+        // 仕方ないので、自力でオブジェクトの差し替えを行う。
+        output = replaceMemberInfoList( output );
+
+        return output;
+    }
+
+    /**
+     * 会員削除<br>
+     * <br>
+     * サイトで管理されている会員を削除します。<br>
+     * 
+     * @param param パラメータ
+     * @throws IOException サーバに接続できなかった場合
+     * @return {@code DeleteMemberOutput}オブジェクト
+     */
+    public static DeleteMemberOutput deleteMember(DeleteMemberParam param) throws IOException
+    {
+        String paramJson = objectToJson( param );
+        String apiUrl = readGmoApiUrl() + "/DeleteMember";
+        String retJson = sslPostRequest( apiUrl, paramJson );
+        DeleteMemberOutput output = jsonToObject( retJson, DeleteMemberOutput.class );
+
+        // errListがLinkedHashMapを格納したリストになっているため、ErrHolderを格納したリストに変換する
+        output.setErrList( convertObjects( output.getErrList(), ErrHolder.class ) );
+
+        return output;
+    }
+
+    /**
+     * カード登録・更新<br>
+     * <br>
+     * 会員のカード情報を登録します。<br>
+     * カードのシーケンス番号を指定した場合更新を行います。 <br>
+     * 登録／更新を行う際に、カードの有効性確認も合わせて行います。<br>
+     * 
+     * @param param パラメータ
+     * @throws IOException サーバに接続できなかった場合
+     * @return {@code SaveCardOutput}オブジェクト
+     */
+    public static SaveCardOutput saveCard(SaveCardParam param) throws IOException
+    {
+        String paramJson = objectToJson( param );
+        String apiUrl = readGmoApiUrl() + "/SaveCard";
+        String retJson = sslPostRequest( apiUrl, paramJson );
+        SaveCardOutput output = jsonToObject( retJson, SaveCardOutput.class );
+
+        // errListがLinkedHashMapを格納したリストになっているため、ErrHolderを格納したリストに変換する
+        output.setErrList( convertObjects( output.getErrList(), ErrHolder.class ) );
+
+        return output;
+    }
+
+    /**
+     * カード照会<br>
+     * <br>
+     * 会員のカード情報を照会します。<br>
+     * 
+     * @param param パラメータ
+     * @throws IOException サーバに接続できなかった場合
+     * @return {@code SearchCardOutput}オブジェクト
+     */
+    public static SearchCardOutput searchCard(SearchCardParam param) throws IOException
+    {
+        String paramJson = objectToJson( param );
+        String apiUrl = readGmoApiUrl() + "/SearchCard";
+        String retJson = sslPostRequest( apiUrl, paramJson );
+        SearchCardOutput output = jsonToObject( retJson, SearchCardOutput.class );
+
+        // errListがLinkedHashMapを格納したリストになっているため、ErrHolderを格納したリストに変換する
+        output.setErrList( convertObjects( output.getErrList(), ErrHolder.class ) );
+
+        // cardListもLinkedHashMapを格納したリストになっているが、
+        // CardInfoがSearchCardOutput内の非staticなインナークラスというナゾ仕様なため、Jacksonで変換しようとすると落ちる。
+        // 仕方ないので、自力でオブジェクトの差し替えを行う。
+        output = replaceCardInfoList( output );
+
+        return output;
+    }
+
+    /**
+     * カード削除<br>
+     * <br>
+     * 会員のカード情報を削除します。<br>
+     * 
+     * @param param パラメータ
+     * @throws IOException サーバに接続できなかった場合
+     * @return {@code DeleteCardOutput}オブジェクト
+     */
+    public static DeleteCardOutput deleteCard(DeleteCardParam param) throws IOException
+    {
+        String paramJson = objectToJson( param );
+        String apiUrl = readGmoApiUrl() + "/DeleteCard";
+        String retJson = sslPostRequest( apiUrl, paramJson );
+        DeleteCardOutput output = jsonToObject( retJson, DeleteCardOutput.class );
+
+        // errListがLinkedHashMapを格納したリストになっているため、ErrHolderを格納したリストに変換する
+        output.setErrList( convertObjects( output.getErrList(), ErrHolder.class ) );
+
+        return output;
+    }
+
+    /**
+     * 決済変更<br>
+     * <br>
+     * 終了した取引の内容を変更します。<br>
+     * 
+     * @param param パラメータ
+     * @throws IOException サーバに接続できなかった場合
+     * @return {@code AlterTranOutput}オブジェクト
+     */
+    public static AlterTranOutput alterTran(AlterTranParam param) throws IOException
+    {
+        String paramJson = objectToJson( param );
+        String apiUrl = readGmoApiUrl() + "/AlterTran";
+        String retJson = sslPostRequest( apiUrl, paramJson );
+        AlterTranOutput output = jsonToObject( retJson, AlterTranOutput.class );
+
+        // errListがLinkedHashMapを格納したリストになっているため、ErrHolderを格納したリストに変換する
+        output.setErrList( convertObjects( output.getErrList(), ErrHolder.class ) );
+
+        return output;
+    }
+
+    /**
+     * 金額変更<br>
+     * <br>
+     * 終了した取引の金額を変更します。<br>
+     * 
+     * @param param パラメータ
+     * @throws IOException サーバに接続できなかった場合
+     * @return {@code ChangeTranOutput}オブジェクト
+     */
+    public static ChangeTranOutput changeTran(ChangeTranParam param) throws IOException
+    {
+        String paramJson = objectToJson( param );
+        String apiUrl = readGmoApiUrl() + "/ChangeTran";
+        String retJson = sslPostRequest( apiUrl, paramJson );
+        ChangeTranOutput output = jsonToObject( retJson, ChangeTranOutput.class );
+
+        // errListがLinkedHashMapを格納したリストになっているため、ErrHolderを格納したリストに変換する
+        output.setErrList( convertObjects( output.getErrList(), ErrHolder.class ) );
+
+        return output;
+    }
+
+    /**
+     * 取引登録<br>
+     * <br>
+     * 決済実行インターフェース等で必要となる、取引IDと取引パスワードの発行を行い、取引を開始します。<br>
+     * 
+     * @param param パラメータ
+     * @throws IOException サーバに接続できなかった場合
+     * @return {@code EntryTranOutput}オブジェクト
+     */
+    public static EntryTranOutput entryTran(EntryTranParam param) throws IOException
+    {
+        String paramJson = objectToJson( param );
+        String apiUrl = readGmoApiUrl() + "/EntryTran";
+        String retJson = sslPostRequest( apiUrl, paramJson );
+        EntryTranOutput output = jsonToObject( retJson, EntryTranOutput.class );
+
+        // errListがLinkedHashMapを格納したリストになっているため、ErrHolderを格納したリストに変換する
+        output.setErrList( convertObjects( output.getErrList(), ErrHolder.class ) );
+
+        return output;
+    }
+
+    /**
+     * 決済実行<br>
+     * <br>
+     * 登録済みの会員IDによる会員ID決済、またはカード番号入力による都度決済を実行します。<br>
+     * 
+     * @param param パラメータ
+     * @throws IOException サーバに接続できなかった場合
+     * @return {@code ExecTranOutput}オブジェクト
+     */
+    public static ExecTranOutput execTran(ExecTranParam param) throws IOException
+    {
+        String paramJson = objectToJson( param );
+        String apiUrl = readGmoApiUrl() + "/ExecTran";
+        String retJson = sslPostRequest( apiUrl, paramJson );
+        ExecTranOutput output = jsonToObject( retJson, ExecTranOutput.class );
+
+        // errListがLinkedHashMapを格納したリストになっているため、ErrHolderを格納したリストに変換する
+        output.setErrList( convertObjects( output.getErrList(), ErrHolder.class ) );
+
+        return output;
+    }
+
+    /**
+     * 会員ID逆引き<br>
+     * <br>
+     * 会員IDの逆引きを行います。<br>
+     * 
+     * @param param パラメータ
+     * @throws IOException サーバに接続できなかった場合
+     * @return {@code SearchCardReverseOutput}オブジェクト
+     */
+    public static SearchCardReverseOutput searchCardReverse(SearchCardReverseParam param) throws IOException
+    {
+        String paramJson = objectToJson( param );
+        String apiUrl = readGmoApiUrl() + "/SearchCardReverse";
+        String retJson = sslPostRequest( apiUrl, paramJson );
+        SearchCardReverseOutput output = jsonToObject( retJson, SearchCardReverseOutput.class );
+
+        // errListがLinkedHashMapを格納したリストになっているため、ErrHolderを格納したリストに変換する
+        output.setErrList( convertObjects( output.getErrList(), ErrHolder.class ) );
+
+        // cardListもLinkedHashMapを格納したリストになっているが、
+        // MemberCardInfoがSearchCardReverseOutput内の非staticなインナークラスというナゾ仕様なため、Jacksonで変換しようとすると落ちる。
+        // 仕方ないので、自力でオブジェクトの差し替えを行う。
+        output = replaceMemberCardInfoList( output );
+
+        return output;
+    }
+
+    /**
+     * GMOのAPIのURLの取得
+     * 
+     * @return GMOのAPIのURL
+     */
+    private static String readGmoApiUrl()
+    {
+        // 例外が発生しても握りつぶされているため、戻り値がnullかどうかで異常を判定する
+        String url = Url.getUrl( "hotenaviGmoApiUrl" );
+        if ( url == null )
+        {
+            throw new UnsupportedOperationException( "gmo-api-url not found." );
+        }
+
+        return url;
+
+    }
+
+    /**
+     * HTTPS通信によるPOSTリクエストの送信<br>
+     * <br>
+     * 証明書のチェックは抑制されています。<br>
+     * 信頼されていないサーバへの接続は控えてください。<br>
+     * 
+     * @param url URL
+     * @param json HTTPSリクエストにセットするためのJSON文字列
+     * @return HTTPSレスポンスのBodyに格納されたJSON文字列
+     * @throws IOException サーバに接続できなかった場合
+     * @throws IllegalArgumentException {@code url}に、HTTPSで通信しないURLを指定した場合
+     */
+    private static String sslPostRequest(String url, String json) throws IOException
+    {
+        StringBuilder responseBody = new StringBuilder();
+        HttpsURLConnection connection = null;
+
+        SSLContext sslContext = null;
+        try
+        {
+            sslContext = SSLContext.getInstance( "TLS" );
+        }
+        catch ( NoSuchAlgorithmException e )
+        {
+            throw new UnsupportedOperationException( e );
+        }
+
+        SSLSocketFactory factory = null;
+        try
+        {
+            class NonAuthentication implements X509TrustManager // HTTPS通信の証明書チェック回避用クラス
+            {
+                @Override
+                public void checkClientTrusted(X509Certificate[] chain, String authType) throws CertificateException
+                {
+                }
+
+                @Override
+                public void checkServerTrusted(X509Certificate[] chain, String authType) throws CertificateException
+                {
+                }
+
+                @Override
+                public X509Certificate[] getAcceptedIssuers()
+                {
+                    return null;
+                }
+            }
+            sslContext.init( null, new X509TrustManager[]{ new NonAuthentication() }, new SecureRandom() );
+            factory = sslContext.getSocketFactory();
+        }
+        catch ( KeyManagementException e )
+        {
+            throw new UnsupportedOperationException( e );
+        }
+
+        try
+        {
+            // リクエストヘッダ作成
+            connection = (HttpsURLConnection)(new URL( url ).openConnection());
+            connection.setDoOutput( true );
+            connection.setRequestMethod( "POST" );
+            connection.setRequestProperty( "Accept-Language", "jp" );
+            connection.setRequestProperty( "Content-Type", "application/JSON; charset=utf-8" );
+            connection.setRequestProperty( "Content-Length", String.valueOf( json.length() ) );
+            connection.setSSLSocketFactory( factory ); // 証明書の検証を抑制
+
+            // リクエストのBodyにJSONをセット
+            final OutputStreamWriter out = new OutputStreamWriter( connection.getOutputStream() );
+            out.write( json );
+            out.flush();
+            out.close();
+
+            connection.connect();
+
+            // HTTPステータスコード200以外は異常とする
+            final int status = connection.getResponseCode();
+            if ( status != HttpURLConnection.HTTP_OK )
+            {
+                throw new IOException( "HTTP Status Code: " + status );
+            }
+
+            final InputStream in = connection.getInputStream();
+            String encoding = connection.getContentEncoding();
+            if ( encoding == null )
+            {
+                encoding = "utf-8";
+            }
+
+            // レスポンスのBodyを取得
+            final InputStreamReader inReader = new InputStreamReader( in, encoding );
+            final BufferedReader bufReader = new BufferedReader( inReader );
+            String line = null;
+            while( (line = bufReader.readLine()) != null )
+            {
+                responseBody.append( line );
+            }
+
+            bufReader.close();
+            inReader.close();
+            in.close();
+        }
+        catch ( ClassCastException e )
+        {
+            Logging.error( "[GMOModuleWrapper.sslPostRequest()] ClassCastException: " + e.toString() );
+            throw new IllegalArgumentException( e );
+        }
+        catch ( IOException e )
+        {
+            Logging.error( "[GMOModuleWrapper.sslPostRequest()] IOException: " + e.toString() );
+            throw e;
+        }
+        finally
+        {
+            if ( connection != null )
+            {
+                connection.disconnect();
+            }
+        }
+
+        return responseBody.toString();
+    }
+
+    /**
+     * オブジェクトのシリアライズ
+     * 
+     * @param obj Javaオブジェクト
+     * @return シリアリアライズされたJSON文字列
+     */
+    private static String objectToJson(Object obj)
+    {
+        String json;
+
+        ObjectMapper mapper = new ObjectMapper();
+
+        try
+        {
+            json = mapper.writeValueAsString( obj );
+        }
+        catch ( JsonProcessingException e )
+        {
+            Logging.error( "[GMOModuleWrapper.objectToJson()] JsonProcessingException: " + e.toString() );
+            throw new UnsupportedOperationException( e );
+        }
+
+        return json;
+    }
+
+    /**
+     * JSON文字列のデシリアライズ
+     * 
+     * @param json JSON文字列
+     * @param theClass デシリアライズするクラス
+     * @return デシリアライズされたJavaオブジェクト
+     * @throws IllegalArgumentException {@code theClass}にJSON文字列が表さないクラスを指定した場合
+     */
+    private static <T> T jsonToObject(String json, Class<T> theClass)
+    {
+        T obj;
+
+        ObjectMapper mapper = new ObjectMapper();
+        mapper.configure( DeserializationFeature.FAIL_ON_UNKNOWN_PROPERTIES, false );
+
+        try
+        {
+            obj = mapper.readValue( json, theClass );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[GMOModuleWrapper.jsonToObject()] Exception: " + e.toString() );
+            throw new IllegalArgumentException( e );
+        }
+
+        return obj;
+    }
+
+    /**
+     * Javaオブジェクトの変換
+     * 
+     * @param obj オブジェクト
+     * @param theClass 変換するクラス
+     * @return 変換されたJavaオブジェクト
+     */
+    private static <T> T convertObject(Object obj, Class<T> theClass)
+    {
+        ObjectMapper mapper = new ObjectMapper();
+        return mapper.convertValue( obj, theClass );
+    }
+
+    /**
+     * 複数のJavaオブジェクトの変換
+     * 
+     * @param objs Javaオブジェクトを格納したリスト
+     * @param theClass 変換するクラス
+     * @return 変換されたJavaオブジェクトを格納したリスト
+     */
+    private static <T> List<T> convertObjects(List<?> objs, Class<T> theClass)
+    {
+        List<T> convertedList = new ArrayList<T>();
+
+        for( Object obj : objs )
+        {
+            convertedList.add( convertObject( obj, theClass ) );
+        }
+
+        return convertedList;
+    }
+
+    /**
+     * {@code SearchMemberOutput.memberList}の差し替え
+     * 
+     * @param searchMemberOutput {@code LinkedHashMap}を格納した{@code memberList}を格納した{@code SearchMemberOutput}オブジェクト
+     * @return {@code MemberInfo}を格納した{@code memberList}を格納した{@code SearchMemberOutput}オブジェクト
+     */
+    private static SearchMemberOutput replaceMemberInfoList(SearchMemberOutput searchMemberOutput)
+    {
+        List<MemberInfo> memberList = new ArrayList<MemberInfo>();
+
+        for( Object obj : searchMemberOutput.getMemberList() )
+        {
+            @SuppressWarnings("unchecked") Map<String, Object> memberInfoMap = (LinkedHashMap<String, Object>)obj;
+            MemberInfo memberInfo = searchMemberOutput.new MemberInfo();
+
+            memberInfo.setMemberId( (String)memberInfoMap.get( "memberId" ) );
+            memberInfo.setMemberName( (String)memberInfoMap.get( "memberName" ) );
+            memberInfo.setDeleteFlag( (String)memberInfoMap.get( "deleteFlag" ) );
+
+            memberList.add( memberInfo );
+        }
+
+        searchMemberOutput.setMemberList( memberList );
+
+        return searchMemberOutput;
+    }
+
+    /**
+     * {@code SearchCardOutput.cardList}の差し替え
+     * 
+     * @param searchCardOutput {@code LinkedHashMap}を格納した{@code cardList}を格納した{@code SearchCardOutput}オブジェクト
+     * @return {@code CardInfo}を格納した{@code cardList}を格納した{@code SearchCardOutput}オブジェクト
+     */
+    private static SearchCardOutput replaceCardInfoList(SearchCardOutput searchCardOutput)
+    {
+        List<CardInfo> cardList = new ArrayList<CardInfo>();
+
+        for( Object obj : searchCardOutput.getCardList() )
+        {
+            @SuppressWarnings("unchecked") Map<String, Object> cardInfoMap = (LinkedHashMap<String, Object>)obj;
+            CardInfo cardInfo = searchCardOutput.new CardInfo();
+
+            cardInfo.setCardSeq( (Integer)cardInfoMap.get( "cardSeq" ) );
+            cardInfo.setDefaultFlag( (String)cardInfoMap.get( "defaultFlag" ) );
+            cardInfo.setCardName( (String)cardInfoMap.get( "cardName" ) );
+            cardInfo.setCardNo( (String)cardInfoMap.get( "cardNo" ) );
+            cardInfo.setExpire( (String)cardInfoMap.get( "expire" ) );
+            cardInfo.setHolderName( (String)cardInfoMap.get( "holderName" ) );
+            cardInfo.setDeleteFlag( (String)cardInfoMap.get( "deleteFlag" ) );
+            cardInfo.setBrand( (String)cardInfoMap.get( "brand" ) );
+            cardInfo.setDomesticFlag( (String)cardInfoMap.get( "domesticFlag" ) );
+            cardInfo.setIssuerCode( (String)cardInfoMap.get( "issuerCode" ) );
+            cardInfo.setDebitPrepaidIssuerName( (String)cardInfoMap.get( "debitPrepaidIssuerName" ) );
+            cardInfo.setDebitPrepaidFlag( (String)cardInfoMap.get( "debitPrepaidFlag" ) );
+            cardInfo.setForwardFinal( (String)cardInfoMap.get( "forwardFinal" ) );
+
+            cardList.add( cardInfo );
+        }
+
+        searchCardOutput.setCardList( cardList );
+
+        return searchCardOutput;
+    }
+
+    /**
+     * {@code SearchCardReverseOutput.cardList}の差し替え
+     * 
+     * @param searchCardReverseOutput {@code LinkedHashMap}を格納した{@code cardList}を格納した{@code SearchCardOutput}オブジェクト
+     * @return {@code MemberCardInfo}を格納した{@code cardList}を格納した{@code SearchCardReverseOutput}オブジェクト
+     */
+    private static SearchCardReverseOutput replaceMemberCardInfoList(SearchCardReverseOutput searchCardReverseOutput)
+    {
+        List<MemberCardInfo> memberCardList = new ArrayList<MemberCardInfo>();
+
+        for( Object obj : searchCardReverseOutput.getCardList() )
+        {
+            @SuppressWarnings("unchecked") Map<String, Object> memberCardInfoMap = (LinkedHashMap<String, Object>)obj;
+            MemberCardInfo memberCardInfo = searchCardReverseOutput.new MemberCardInfo();
+
+            memberCardInfo.setMemberId( (String)memberCardInfoMap.get( "memberId" ) );
+            memberCardInfo.setCreateDate( (String)memberCardInfoMap.get( "createDate" ) );
+            memberCardInfo.setDeleteFlag( (String)memberCardInfoMap.get( "deleteFlag" ) );
+
+            memberCardList.add( memberCardInfo );
+        }
+
+        searchCardReverseOutput.setCardList( memberCardList );
+
+        return searchCardReverseOutput;
+    }
+}

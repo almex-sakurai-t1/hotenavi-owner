@@ -1,0 +1,98 @@
+body {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	text-decoration: none;
+}
+a:hover {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	text-decoration: underline;
+}
+a:link {
+
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	text-decoration: none;
+}
+a:visited {
+
+
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	text-decoration: none;
+}
+a:active {
+
+
+
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	text-decoration: none;
+}
+.sama {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	color: #FFFFFF;
+	text-decoration: none;
+	padding-right: 6px;
+
+}
+.logout {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	color: #FFFFFF;
+	text-decoration: none;
+	padding-right: 6px;
+	padding-top: 6px;
+
+}
+
+a.logout {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	color: #FFFFFF;
+	text-decoration: none;
+	padding-right: 6px;
+	padding-top: 12px;
+
+}
+
+a.logout:link {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	color: #FFFFFF;
+	text-decoration: none;
+	padding-right: 6px;
+	padding-top: 12px;
+
+}
+
+a.logout:active {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	color: #FFFFFF;
+	text-decoration: none;
+	padding-right: 6px;
+	padding-top: 12px;
+
+}
+
+a.logout:visited {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	color: #FFFFFF;
+	text-decoration: none;
+	padding-right: 6px;
+	padding-top: 12px;
+
+}
+
+a.logout:hover {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	color: #FFFFFF;
+	text-decoration: underline;
+	padding-right: 6px;
+	padding-top: 12px;
+
+}

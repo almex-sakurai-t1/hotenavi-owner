@@ -1,0 +1,452 @@
+package jp.happyhotel.action;
+
+import java.io.IOException;
+import java.net.URI;
+import java.security.MessageDigest;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.co.yahoo.yconnect.YConnectExplicit;
+import jp.co.yahoo.yconnect.core.api.ApiClientException;
+import jp.co.yahoo.yconnect.core.oauth2.AuthorizationException;
+import jp.co.yahoo.yconnect.core.oauth2.OAuth2ResponseType;
+import jp.co.yahoo.yconnect.core.oauth2.TokenException;
+import jp.co.yahoo.yconnect.core.oidc.IdTokenObject;
+import jp.co.yahoo.yconnect.core.oidc.OIDCDisplay;
+import jp.co.yahoo.yconnect.core.oidc.OIDCPrompt;
+import jp.co.yahoo.yconnect.core.oidc.OIDCScope;
+import jp.co.yahoo.yconnect.core.oidc.UserInfoObject;
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.CheckString;
+import jp.happyhotel.common.CreateToken;
+import jp.happyhotel.common.DateEdit;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.common.Url;
+import jp.happyhotel.common.UserAgent;
+import jp.happyhotel.data.DataLoginInfo_M2;
+import jp.happyhotel.data.DataUserSp;
+
+public class ActionYWalletAuthnService extends BaseAction
+{
+    private RequestDispatcher requestDispatcher = null;
+    private static String     HTTP_TOP_URL      = Url.getUrl() + "/";
+    private static String     TOP_URL           = Url.getSslUrl() + "/";
+    // private static String APP_ID = "dj0zaiZpPTg3YWZFWjJuVlREeCZkPVlXazlhWE5ZUWtKSE4yY21jR285TUEtLSZzPWNvbnN1bWVyc2VjcmV0Jng9YjE-"; // テスト用
+    // private static String SECRET = "afd2a3f6bf02c0899fb24ff5ea9bd468af1c5608"; // テスト用
+    private static String     REDIRECT_URL      = TOP_URL + "yWalletAuthnService.act";
+
+    private static String     APP_ID            = "dj0zaiZpPUtRUllnTElqV0dvTSZkPVlXazlWRUZZYlVjM05EZ21jR285TUEtLSZzPWNvbnN1bWVyc2VjcmV0Jng9ZWM-"; // 本番用
+    private static String     SECRET            = "0fe89cd2d8833e42e56f9760e629571f4e243b54";                                                    // テスト用
+
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+
+        response.setContentType( "text/html; charset=UTF-8" );
+        int nType = 0;
+        int deviceType = 0;
+        String deviceURL = "";
+        CreateToken ct = new CreateToken();
+        String openId = "";
+        String paramKind = "";
+        // state、nonceにランダムな値を初期化
+        String state = "";
+        String nonce = "";
+        String queryString = "";
+        String sendURL = "";
+        DataLoginInfo_M2 dataLoginInfo_M2;
+
+        // YConnectインスタンス生成
+        YConnectExplicit yconnect = new YConnectExplicit();
+
+        try
+        {
+            // ログイン、入会時、退会時のパラメータにより、条件を分ける
+            paramKind = request.getParameter( "kind" );
+            if ( (paramKind == null) || (paramKind.equals( "" ) != false) || (CheckString.numCheck( paramKind ) == false) )
+            {
+                paramKind = "0";// 0:入会区分、1:退会区分
+            }
+            queryString = "?kind=" + paramKind;
+
+            nType = UserAgent.getUserAgentType( request );
+            if ( nType == UserAgent.USERAGENT_SMARTPHONE )
+            {
+                deviceType = 1;
+                deviceURL = "/phone";
+            }
+            else
+            {
+                deviceType = 0;
+            }
+
+            // ユーザ情報取得
+            dataLoginInfo_M2 = (DataLoginInfo_M2)request.getAttribute( "LOGIN_INFO" );
+            if ( dataLoginInfo_M2 == null )
+            {
+                // ログアウト状態の場合はエラー
+                response.sendRedirect( TOP_URL + deviceURL );
+                return;
+            }
+            else if ( paramKind.equals( "0" ) != false && dataLoginInfo_M2.isPaymemberFlag() != false )
+            {
+                // 有料会員は登録させない
+                response.sendRedirect( TOP_URL + deviceURL );
+                return;
+            }
+
+            state = this.getMd5( DateEdit.getDate( 2 ) + state );
+            nonce = this.getMd5( DateEdit.getDate( 2 ) + nonce );
+
+            // コールバックURLから各パラメーターを抽出
+            if ( yconnect.hasAuthorizationCode( request ) )
+            {
+
+                /*********************************************************
+                 * Parse the Callback URI and Save the Access Token.
+                 *********************************************************/
+
+                Logging.info( "[ActionYWalletAuthnService]  state=" + state );
+                // 認可コードを取得
+                String code = yconnect.getAuthorizationCode( state );
+
+                Logging.info( "[ActionYWalletAuthnService] code=" + code + ", state=" + state );
+
+                /***********************************************
+                 * Request Access Token adn Refresh Token.
+                 ***********************************************/
+
+                Logging.info( "[ActionYWalletAuthnService] Request Access Token adn Refresh Token." );
+                Logging.info( "[ActionYWalletAuthnService] Request Access Token adn Refresh Token." );
+
+                Logging.info( "[ActionYWalletAuthnService] code:" + code + ", APP_ID:" + APP_ID + ", SECRET:" + SECRET + ", REDIRECT_URL:" + REDIRECT_URL + ", " + queryString );
+                // Tokenエンドポイントにリクエスト
+                yconnect.requestToken( code, APP_ID, SECRET, REDIRECT_URL + queryString );
+                Logging.info( "[ActionYWalletAuthnService] yconnect.requestToken:" );
+                // アクセストークン、リフレッシュトークン、IDトークンを取得
+                String accessTokenString = yconnect.getAccessToken();
+                long expiration = yconnect.getAccessTokenExpiration();
+                String refreshToken = yconnect.getRefreshToken();
+                String idTokenString = yconnect.getIdToken();
+                Logging.info( "[ActionYWalletAuthnService] accessToken=" + accessTokenString );
+                Logging.info( "[ActionYWalletAuthnService] Expiration=" + expiration );
+                Logging.info( "[ActionYWalletAuthnService] refreshToken=" + refreshToken );
+
+                /************************
+                 * Decode ID Token.
+                 ************************/
+
+                // // IDトークンを復号化、値の検証
+                IdTokenObject idTokenObject = yconnect.decodeIdToken( idTokenString, nonce, APP_ID );
+                Logging.info( "[ActionYWalletAuthnService] ID Token=" + idTokenObject.toString() );
+
+                /*************************
+                 * Request UserInfo.
+                 *************************/
+
+                if ( accessTokenString.equals( "" ) == false )
+                {
+
+                    Logging.info( "[ActionYWalletAuthnService] Request UserInfo." );
+
+                    // UserInfoエンドポイントへリクエスト
+                    yconnect.requestUserInfo( accessTokenString );
+
+                    Logging.info( "[ActionYWalletAuthnService] TEST1" );
+
+                    // UserInfo情報を取得
+                    UserInfoObject userInfoObject = yconnect.getUserInfoObject();
+
+                    if ( userInfoObject != null )
+                    {
+
+                        openId = userInfoObject.getUserId();
+
+                        Logging.info( "[ActionYWalletAuthnService] openId:" + userInfoObject.getUserId() );
+                        if ( openId.equals( "" ) == false )
+                        {
+                            Cookie addCookie;
+                            addCookie = new Cookie( "hhywhappy", openId );
+                            addCookie.setPath( "/" );
+                            addCookie.setMaxAge( Integer.MAX_VALUE );
+                            addCookie.setDomain( ".happyhotel.jp" );
+                            response.addCookie( addCookie );
+
+                            request.setAttribute( "OPENID", openId );
+                            request.setAttribute( "TOKEN", accessTokenString );
+                            request.setAttribute( "REF_TOKEN", refreshToken );
+
+                            Logging.info( "openId:" + openId );
+                            Logging.info( "token:" + accessTokenString );
+                            Logging.info( "ref_token:" + refreshToken );
+
+                            if ( paramKind.equals( "0" ) )
+                            {
+                                boolean ret = false;
+                                ret = checkDataUserSp( dataLoginInfo_M2.getUserId(), openId );
+                                sendURL = "/yWalletCharge.act";
+                            }
+                            else if ( paramKind.equals( "1" ) )
+                            {
+                                sendURL = "/yWalletSecession.act";
+                            }
+                            Logging.info( "[ActionYWalletAuthnService] sendURL=" + sendURL );
+
+                            requestDispatcher = request.getRequestDispatcher( sendURL );
+                            requestDispatcher.forward( request, response );
+                            return;
+                        }
+                    }
+                }
+            }
+            else
+            {
+
+                /****************************************************************
+                 * Request Authorization Endpoint for getting Access Token.
+                 ****************************************************************/
+
+                // 各パラメーター初期化
+                String responseType = OAuth2ResponseType.CODE_IDTOKEN;
+                String display = "";
+                String[] prompt = { OIDCPrompt.DEFAULT };
+                String[] scope = { OIDCScope.OPENID, OIDCScope.PROFILE,
+                        OIDCScope.EMAIL, OIDCScope.ADDRESS };
+
+                if ( UserAgent.getUserAgentType( request ) == UserAgent.USERAGENT_SMARTPHONE )
+                {
+                    display = OIDCDisplay.SMART_PHONE;
+                }
+                else
+                {
+                    display = OIDCDisplay.DEFAULT;
+                }
+
+                // 各パラメーターを設定
+                yconnect.init( APP_ID, REDIRECT_URL + queryString, state, responseType, display, prompt, scope, nonce );
+                URI uri = yconnect.generateAuthorizationUri();
+
+                Logging.info( "[ActionYWalletAuthnService] redirectURL=" + uri.toString() );
+
+                // Authorizationエンドポイントにリダイレクト(同意画面を表示)
+                response.sendRedirect( uri.toString() );
+                return;
+            }
+
+        }
+        catch ( ApiClientException ace )
+        {
+
+            // アクセストークンが有効期限切れであるかチェック
+            if ( ace.isInvalidToken() )
+            {
+
+                /*****************************
+                 * Refresh Access Token.
+                 *****************************/
+
+                try
+                {
+                    Logging.info( "[ActionYWalletAuthnService] Refresh AccessToken" );
+
+                    // 保存していたリフレッシュトークンを指定してください
+                    String refreshToken = (String)request.getAttribute( "REF_TOKEN" );
+                    if ( refreshToken == null )
+                    {
+                        refreshToken = "";
+                    }
+
+                    // Tokenエンドポイントにリクエストしてアクセストークンを更新
+                    yconnect.refreshToken( refreshToken, APP_ID, SECRET );
+                    String accessTokenString = yconnect.getAccessToken();
+                    long expiration = yconnect.getAccessTokenExpiration();
+
+                    Logging.info( "[ActionYWalletAuthnService] refesh AccessToken:" + accessTokenString );
+                    Logging.info( "[ActionYWalletAuthnService] refesh Expiration:" + expiration );
+
+                }
+                catch ( TokenException te )
+                {
+                    // リフレッシュトークンの有効期限切れチェック
+                    if ( te.isInvalidGrant() )
+                    {
+                        try
+                        {
+                            // はじめのAuthorizationエンドポイントリクエストからやり直してください
+                            response.sendRedirect( HTTP_TOP_URL + "index_yc.jsp" );
+                        }
+                        catch ( Exception excep )
+                        {
+                            Logging.error( "[ActionYWalletAuthnService] sendRedirect Exception:" + excep.toString() );
+                        }
+                    }
+                    Logging.error( "[ActionYWalletAuthnService] TokenException1:" + te.toString() );
+                }
+                catch ( Exception e )
+                {
+                    Logging.error( "[ActionYWalletAuthnService] Exception1:" + e.toString() );
+                }
+
+            }
+            Logging.error( "[ActionYWalletAuthnService] ApiClientException:" + ace.toString() );
+        }
+        catch ( AuthorizationException e )
+        {
+            Logging.error( "[ActionYWalletAuthnService] AuthorizationException:" + e.toString() );
+            try
+            {
+                response.sendRedirect( REDIRECT_URL + queryString );
+            }
+            catch ( IOException e1 )
+            {
+            }
+        }
+        catch ( TokenException e )
+        {
+            Logging.error( "[ActionYWalletAuthnService] TokenException2:" + e.toString() );
+            try
+            {
+                response.sendRedirect( REDIRECT_URL + queryString );
+            }
+            catch ( IOException e1 )
+            {
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionYWalletAuthnService] Exception2:" + e.toString() );
+        }
+    }
+
+    /**
+     * ユーザSP情報チェック
+     * 
+     * @param userId
+     * @param suid
+     * @return
+     */
+    private boolean checkDataUserSp(String userId, String suid)
+    {
+        final int YWALLET = 4;
+        DataUserSp dus;
+        boolean ret = false;
+        try
+        {
+            Logging.info( "[ActionYWalletAuthnService] checkDataUserSp userId:" + userId + ", suid:" + suid );
+
+            dus = new DataUserSp();
+            ret = dus.getDataBySuid( suid );
+            // SUIDでデータ取得
+            if ( ret != false )
+            {
+                // すでに有料フラグが立っている場合はエラー
+                if ( dus.getChargeFlag() == 1 )
+                {
+                    Logging.info( "[ActionYWalletAuthnService] chargeFlag=1" );
+                    ret = false;
+                    return ret;
+                }
+                // ログインユーザIDと異なったら、再度ログインをしてもらう
+                if ( dus.getUserId().equals( userId ) == false )
+                {
+                    Logging.info( "[ActionYWalletAuthnService] userId != dus.getUserId()" );
+                    return ret;
+                }
+            }
+
+            // SUIDで登録していない場合は、ユーザIDでデータ取得
+            ret = dus.getData( userId );
+            if ( ret == false )
+            {
+                ret = dus.getData( suid );
+                // SUIDで登録していたら、ユーザIDに書き換える
+                if ( ret != false )
+                {
+                    Logging.info( "[ActionYWalletAuthnService] updateDus userId:" + userId + ", suid:" + suid );
+                    dus.setUserId( userId );
+                    dus.setOpenId( suid );
+                    dus.setCarrierKind( YWALLET );
+                    dus.setToken( "" );
+                    dus.setDelFlag( 0 );
+                    dus.updateData( suid );
+                    ret = true;
+                }
+                else
+                {
+                    Logging.info( "[ActionYWalletAuthnService] insertDus userId:" + userId + ", suid:" + suid );
+                    dus.setUserId( userId );
+                    dus.setOpenId( suid );
+                    dus.setCarrierKind( YWALLET );
+                    dus.setToken( "" );
+                    dus.insertData();
+                    // SUIDのデータを消しておく
+                    dus.deleteData( suid );
+                    ret = true;
+                }
+            }
+            else
+            {
+                Logging.info( "[ActionYWalletAuthnService] reRegist userId:" + userId + ", suid:" + suid );
+                // 再入会扱いとしてデータを復元する
+                dus.setOpenId( suid );
+                dus.setCarrierKind( YWALLET );
+                dus.setToken( "" );
+                dus.setDelFlag( 0 );
+                ret = dus.updateData( userId );
+
+                Logging.info( "[ActionYWalletAuthnService] reRegist update:" + ret );
+
+                // SUIDのデータを消しておく
+                dus.deleteData( suid );
+                Logging.info( "[ActionYWalletAuthnService] userId:" + userId + ", suid:" + suid );
+                ret = true;
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[regist_pay.jsp DataUserSp.inserData()] Exception" + e.toString() );
+        }
+        return ret;
+    }
+
+    /**
+     * MD5変換処理
+     * 
+     * @param message メッセージ
+     * @return 処理結果(null：MD5変換失敗)
+     **/
+    private String getMd5(String message)
+    {
+        byte[] bytePass;
+        String strReturn = null;
+
+        try
+        {
+            MessageDigest md = MessageDigest.getInstance( "MD5" );
+            bytePass = message.getBytes();
+            md.update( bytePass );
+            bytePass = md.digest();
+
+            StringBuffer buff = new StringBuffer();
+            for( int i = 0 ; i < bytePass.length ; i++ )
+            {
+                int val = bytePass[i] & 0xff;
+                if ( val < 16 )
+                {
+                    buff.append( "0" );
+                }
+                buff.append( Integer.toString( val, 16 ) );
+            }
+            strReturn = buff.toString();
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionYWalletUseStop.getMd5()]Exception:" + e.toString() );
+        }
+
+        return(strReturn);
+    }
+
+}

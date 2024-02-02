@@ -1,0 +1,549 @@
+package jp.happyhotel.data;
+
+/*
+ * ホテル認証データ
+ * generator Version 1.0.0 release 2011/01/12
+ * generated Date Wed Jan 12 16:30:53 JST 2011
+ */
+import java.io.Serializable;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+
+import jp.happyhotel.common.DBConnection;
+import jp.happyhotel.common.Logging;
+
+/**
+ * ホテル認証データ
+ * 
+ * @author S.Tashiro
+ * @version 1.00 2011/01/12
+ */
+public class DataHotelAuth implements Serializable
+{
+    private static final long serialVersionUID = -1004988843280584964L;
+    private String            licenceKey;
+    private int               id;
+    private String            macAddr;
+    private int               registStatus;
+    private int               registDate;
+    private int               registTime;
+    private int               authDate;
+    private int               authTime;
+    private int               lastUpdate;
+    private int               lastUptime;
+    private String            version;
+    private int               rsvAddDate;
+    private int               rsvAddTime;
+    private int               rsvLastUpdate;
+    private int               rsvLastUptime;
+    private int               rsvVersion;
+
+    public DataHotelAuth()
+    {
+        licenceKey = "";
+        id = 0;
+        macAddr = "";
+        registStatus = 0;
+        registDate = 0;
+        registTime = 0;
+        authDate = 0;
+        authTime = 0;
+        lastUpdate = 0;
+        lastUptime = 0;
+        version = "";
+        rsvAddDate = 0;
+        rsvAddTime = 0;
+        rsvLastUpdate = 0;
+        rsvLastUptime = 0;
+        rsvVersion = 0;
+    }
+
+    public String getLicenceKey()
+    {
+        return this.licenceKey;
+    }
+
+    public void setLicenceKey(String licenceKey)
+    {
+        this.licenceKey = licenceKey;
+    }
+
+    public int getId()
+    {
+        return this.id;
+    }
+
+    public void setId(int id)
+    {
+        this.id = id;
+    }
+
+    public String getMacAddr()
+    {
+        return this.macAddr;
+    }
+
+    public void setMacAddr(String macAddr)
+    {
+        this.macAddr = macAddr;
+    }
+
+    public int getRegistStatus()
+    {
+        return registStatus;
+    }
+
+    public void setRegistStatus(int registStatus)
+    {
+        this.registStatus = registStatus;
+    }
+
+    public int getRegistDate()
+    {
+        return this.registDate;
+    }
+
+    public void setRegistDate(int registDate)
+    {
+        this.registDate = registDate;
+    }
+
+    public int getRegistTime()
+    {
+        return this.registTime;
+    }
+
+    public void setRegistTime(int registTime)
+    {
+        this.registTime = registTime;
+    }
+
+    public int getAuthDate()
+    {
+        return this.authDate;
+    }
+
+    public void setAuthDate(int authDate)
+    {
+        this.authDate = authDate;
+    }
+
+    public int getAuthTime()
+    {
+        return this.authTime;
+    }
+
+    public void setAuthTime(int authTime)
+    {
+        this.authTime = authTime;
+    }
+
+    public int getLastUpdate()
+    {
+        return this.lastUpdate;
+    }
+
+    public void setLastUpdate(int lastUpdate)
+    {
+        this.lastUpdate = lastUpdate;
+    }
+
+    public int getLastUptime()
+    {
+        return this.lastUptime;
+    }
+
+    public void setLastUptime(int lastUptime)
+    {
+        this.lastUptime = lastUptime;
+    }
+
+    public String getVersion()
+    {
+        return version;
+    }
+
+    public void setVersion(String version)
+    {
+        this.version = version;
+    }
+
+    public int getRsvAddDate()
+    {
+        return this.rsvAddDate;
+    }
+
+    public void setRsvAddDate(int rsvAddDate)
+    {
+        this.rsvAddDate = rsvAddDate;
+    }
+
+    public int getRsvAddTime()
+    {
+        return this.rsvAddTime;
+    }
+
+    public void setRsvAddTime(int rsvAddTime)
+    {
+        this.rsvAddTime = rsvAddTime;
+    }
+
+    public int getRsvLastUpdate()
+    {
+        return this.rsvLastUpdate;
+    }
+
+    public void setRsvLastUpdate(int rsvLastUpdate)
+    {
+        this.rsvLastUpdate = rsvLastUpdate;
+    }
+
+    public int getRsvLastUptime()
+    {
+        return this.rsvLastUptime;
+    }
+
+    public void setRsvLastUptime(int rsvLastUptime)
+    {
+        this.rsvLastUptime = rsvLastUptime;
+    }
+
+    public int getRsvVersion()
+    {
+        return this.rsvVersion;
+    }
+
+    public void setRsvVersion(int rsvVersion)
+    {
+        this.rsvVersion = rsvVersion;
+    }
+
+    /**
+     * ホテル認証データ取得
+     * 
+     * @param licenceKey ライセンスキー
+     * @return 処理結果(TRUE:正常,FALSE:異常)
+     */
+    public boolean getData(String licenceKey)
+    {
+        boolean ret;
+        String query;
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+
+        ret = false;
+
+        query = "SELECT * FROM hh_hotel_auth WHERE licence_key = ?";
+        try
+        {
+            connection = DBConnection.getConnection();
+            prestate = connection.prepareStatement( query );
+            prestate.setString( 1, licenceKey );
+            result = prestate.executeQuery();
+            if ( result != null )
+            {
+                if ( result.next() != false )
+                {
+                    this.licenceKey = result.getString( "licence_key" );
+                    this.id = result.getInt( "id" );
+                    this.macAddr = result.getString( "mac_addr" );
+                    this.registStatus = result.getInt( "regist_status" );
+                    this.registDate = result.getInt( "regist_date" );
+                    this.registTime = result.getInt( "regist_time" );
+                    this.authDate = result.getInt( "auth_date" );
+                    this.authTime = result.getInt( "auth_time" );
+                    this.lastUpdate = result.getInt( "last_update" );
+                    this.lastUptime = result.getInt( "last_uptime" );
+                    this.version = result.getString( "version" );
+                    this.rsvAddDate = result.getInt( "rsv_add_date" );
+                    this.rsvAddTime = result.getInt( "rsv_add_time" );
+                    this.rsvLastUpdate = result.getInt( "rsv_last_update" );
+                    this.rsvLastUptime = result.getInt( "rsv_last_uptime" );
+                    this.rsvVersion = result.getInt( "rsv_version" );
+
+                    ret = true;
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[DataHotelAuth.getData] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+        }
+        return(ret);
+    }
+
+    /**
+     * ホテル認証データ取得
+     * 
+     * @param licenceKey ライセンスキー
+     * @param macAddr
+     * @return 処理結果(TRUE:正常,FALSE:異常)
+     * @see 有効なデータのみ取得
+     */
+    public boolean getValidData(String licenceKey, String macAddr)
+    {
+        boolean ret;
+        String query;
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+
+        ret = false;
+
+        query = "SELECT hh_hotel_auth.* FROM hh_hotel_auth, hh_hotel_basic" +
+                " WHERE hh_hotel_basic.id = hh_hotel_auth.id " +
+                " AND licence_key = ? AND mac_addr = ? AND regist_status = 1";
+
+        // TODO テストのため、ライセンスキーが通っていればOKとして返す
+        // query = "SELECT hh_hotel_auth.* FROM hh_hotel_auth, hh_hotel_basic" +
+        // " WHERE hh_hotel_basic.id = hh_hotel_auth.id " +
+        // " AND licence_key = ? AND regist_status = 1";
+
+        try
+        {
+            connection = DBConnection.getConnection();
+            prestate = connection.prepareStatement( query );
+            prestate.setString( 1, licenceKey );
+            prestate.setString( 2, macAddr );
+            result = prestate.executeQuery();
+            if ( result != null )
+            {
+                if ( result.next() != false )
+                {
+                    this.licenceKey = result.getString( "licence_key" );
+                    this.id = result.getInt( "id" );
+                    this.macAddr = result.getString( "mac_addr" );
+                    this.registStatus = result.getInt( "regist_status" );
+                    this.registDate = result.getInt( "regist_date" );
+                    this.registTime = result.getInt( "regist_time" );
+                    this.authDate = result.getInt( "auth_date" );
+                    this.authTime = result.getInt( "auth_time" );
+                    this.lastUpdate = result.getInt( "last_update" );
+                    this.lastUptime = result.getInt( "last_uptime" );
+                    this.version = result.getString( "version" );
+                    this.rsvAddDate = result.getInt( "rsv_add_date" );
+                    this.rsvAddTime = result.getInt( "rsv_add_time" );
+                    this.rsvLastUpdate = result.getInt( "rsv_last_update" );
+                    this.rsvLastUptime = result.getInt( "rsv_last_uptime" );
+                    this.rsvVersion = result.getInt( "rsv_version" );
+
+                    ret = true;
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[DataHotelAuth.getValidData] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+        }
+        return(ret);
+    }
+
+    /**
+     * ホテル認証データ取得
+     * 
+     * @param result ユーザ基本データレコード
+     * @return 処理結果(TRUE:正常,FALSE:異常)
+     */
+    public boolean setData(ResultSet result)
+    {
+        boolean ret;
+        ret = false;
+        try
+        {
+            if ( result != null )
+            {
+                this.licenceKey = result.getString( "licence_key" );
+                this.id = result.getInt( "id" );
+                this.macAddr = result.getString( "mac_addr" );
+                this.registStatus = result.getInt( "regist_status" );
+                this.registDate = result.getInt( "regist_date" );
+                this.registTime = result.getInt( "regist_time" );
+                this.authDate = result.getInt( "auth_date" );
+                this.authTime = result.getInt( "auth_time" );
+                this.lastUpdate = result.getInt( "last_update" );
+                this.lastUptime = result.getInt( "last_uptime" );
+                this.version = result.getString( "version" );
+                this.rsvAddDate = result.getInt( "rsv_add_date" );
+                this.rsvAddTime = result.getInt( "rsv_add_time" );
+                this.rsvLastUpdate = result.getInt( "rsv_last_update" );
+                this.rsvLastUptime = result.getInt( "rsv_last_uptime" );
+                this.rsvVersion = result.getInt( "rsv_version" );
+
+                ret = true;
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[DataHotelAuth.setData] Exception=" + e.toString() );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * ホテル認証データ追加
+     * 
+     * @see "値のセット後(setXXX)に行うこと"
+     * @return 処理結果(TRUE:正常,FALSE:異常)
+     */
+    public boolean insertData()
+    {
+        int result;
+        boolean ret;
+        String query;
+        Connection connection = null;
+        PreparedStatement prestate = null;
+
+        ret = false;
+
+        query = "INSERT hh_hotel_auth SET ";
+        query += " licence_key = ?,";
+        query += " id = ?,";
+        query += " mac_addr = ?,";
+        query += " regist_status = ?,";
+        query += " regist_date = ?,";
+        query += " regist_time = ?,";
+        query += " auth_date = ?,";
+        query += " auth_time = ?,";
+        query += " last_update = ?,";
+        query += " last_uptime = ?,";
+        query += " version = ?,";
+        query += " rsv_add_date = ?,";
+        query += " rsv_add_time = ?,";
+        query += " rsv_last_update = ?,";
+        query += " rsv_last_uptime = ?,";
+        query += " rsv_version = ?";
+
+        try
+        {
+            connection = DBConnection.getConnection();
+            prestate = connection.prepareStatement( query );
+
+            // 更新対象の値をセットする
+            prestate.setString( 1, this.licenceKey );
+            prestate.setInt( 2, this.id );
+            prestate.setString( 3, this.macAddr );
+            prestate.setInt( 4, this.registStatus );
+            prestate.setInt( 5, this.registDate );
+            prestate.setInt( 6, this.registTime );
+            prestate.setInt( 7, this.authDate );
+            prestate.setInt( 8, this.authTime );
+            prestate.setInt( 9, this.lastUpdate );
+            prestate.setInt( 10, this.lastUptime );
+            prestate.setString( 11, this.version );
+            prestate.setInt( 12, this.rsvAddDate );
+            prestate.setInt( 13, this.rsvAddTime );
+            prestate.setInt( 14, this.rsvLastUpdate );
+            prestate.setInt( 15, this.rsvLastUptime );
+            prestate.setInt( 16, this.rsvVersion );
+
+            result = prestate.executeUpdate();
+            if ( result > 0 )
+            {
+                ret = true;
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[DataHotelAuth.insertData] Exception=" + e.toString() );
+            ret = false;
+        }
+        finally
+        {
+            DBConnection.releaseResources( prestate );
+            DBConnection.releaseResources( connection );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * ホテル認証データ変更
+     * 
+     * @see "値のセット後(setXXX)に行うこと"
+     * @param licencekey ライセンスキー
+     * @return 処理結果(TRUE:正常,FALSE:異常)
+     */
+    public boolean updateData(String licencekey)
+    {
+        int result;
+        boolean ret;
+        String query;
+        Connection connection = null;
+        PreparedStatement prestate = null;
+
+        ret = false;
+
+        query = "UPDATE hh_hotel_auth SET ";
+        query += " id = ?,";
+        query += " mac_addr = ?,";
+        query += " regist_status = ?,";
+        query += " regist_date = ?,";
+        query += " regist_time = ?,";
+        query += " auth_date = ?,";
+        query += " auth_time = ?,";
+        query += " last_update = ?,";
+        query += " last_uptime = ?,";
+        query += " version = ?,";
+        query += " rsv_add_date = ?,";
+        query += " rsv_add_time = ?,";
+        query += " rsv_last_update = ?,";
+        query += " rsv_last_uptime = ?,";
+        query += " rsv_version = ?";
+
+        query += " WHERE licence_key = ?";
+
+        try
+        {
+            connection = DBConnection.getConnection();
+            prestate = connection.prepareStatement( query );
+
+            // 更新対象の値をセットする
+            prestate.setInt( 1, this.id );
+            prestate.setString( 2, this.macAddr );
+            prestate.setInt( 3, this.registStatus );
+            prestate.setInt( 4, this.registDate );
+            prestate.setInt( 5, this.registTime );
+            prestate.setInt( 6, this.authDate );
+            prestate.setInt( 7, this.authTime );
+            prestate.setInt( 8, this.lastUpdate );
+            prestate.setInt( 9, this.lastUptime );
+            prestate.setString( 10, this.version );
+            prestate.setInt( 11, this.rsvAddDate );
+            prestate.setInt( 12, this.rsvAddTime );
+            prestate.setInt( 13, this.rsvLastUpdate );
+            prestate.setInt( 14, this.rsvLastUptime );
+            prestate.setInt( 15, this.rsvVersion );
+
+            prestate.setString( 16, licenceKey );
+
+            result = prestate.executeUpdate();
+            if ( result > 0 )
+            {
+                ret = true;
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[DataHotelAuth.updateData] Exception=" + e.toString() );
+            ret = false;
+        }
+        finally
+        {
+            DBConnection.releaseResources( prestate );
+            DBConnection.releaseResources( connection );
+        }
+
+        return(ret);
+    }
+}

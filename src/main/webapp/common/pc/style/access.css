@@ -1,0 +1,70 @@
+a {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	text-decoration: underline;
+	font-weight: bold;
+}
+a:link {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-weight: bold;
+	text-decoration: underline;
+}
+a:visited {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-weight: bold;
+	text-decoration: underline;
+}
+a:hover {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-weight: bold;
+	text-decoration: underline;
+	color: #FF9900;
+
+
+}
+a:active {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-weight: bold;
+	text-decoration: underline;
+}
+.back {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 14px;
+	font-weight: bold;
+	color: #FFFFFF;
+	text-decoration: none;
+}
+a.back {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 14px;
+	font-weight: bold;
+	color: #FFFFFF;
+	text-decoration: none;
+}
+a.back:link {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 14px;
+	font-weight: bold;
+	color: #FFFFFF;
+	text-decoration: none;
+}
+a.back:visited {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 14px;
+	font-weight: bold;
+	color: #FFFFFF;
+	text-decoration: none;
+}
+a.back:hover {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 14px;
+	font-weight: bold;
+	color: #FF9900;
+	text-decoration: underline;
+}
+a.back:acitive {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 14px;
+	font-weight: bold;
+	color: #FFFFFF;
+	text-decoration: none;
+}

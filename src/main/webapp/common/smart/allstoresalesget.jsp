@@ -1,0 +1,272 @@
+<%@ page contentType="text/html; charset=Windows-31J" %>
+<%@ page import="java.text.*" %>
+<%@ page errorPage="error.jsp" %>
+<%@ page import="java.text.*"%>
+<%@ page import="java.util.*" %>
+<%@ page import="java.sql.*" %>
+<%@ page import="com.hotenavi2.common.*" %>
+<jsp:useBean id="ownerinfo" scope="session" class="com.hotenavi2.owner.OwnerInfo" />
+<%@ include file="getCalendar.jsp" %>
+
+<%
+    String requestUri = request.getRequestURI();
+    if( requestUri.indexOf("/mobile/") > 0 )
+    {
+%>
+<jsp:forward page="timeout.jsp" />
+<%
+    }
+    String loginHotelId =  (String)session.getAttribute("HotelId");
+    String loginId      = (String)session.getAttribute("LoginId");
+    boolean DemoMode = false;
+    if (loginHotelId.equals("demo") && loginId.equals("000000000000000"))
+    {
+        DemoMode = true;
+    }
+    float per = ((float)ownerinfo.SalesGetStartDate-20050325)/(float)50000;
+
+    String    year;
+    String    month;
+    String    day;
+    String    endyear;
+    String    endmonth;
+    String    endday;
+    int       ymd;
+    int       endymd;
+    int       today_year;
+    int       today_month;
+    int       today_day;
+    int       today_ymd;
+    int       int_startyear = 0;
+    int       int_startmonth = 0;
+    int       int_startday = 0;
+    int       int_endyear = 0;
+    int       int_endmonth = 0;
+    int       int_endday = 0;
+    int       err_flg = 0;
+    boolean   rangeMode = false;
+
+    year  = ReplaceString.getParameter(request,"Year");
+    month = ReplaceString.getParameter(request,"Month");
+    day   = ReplaceString.getParameter(request,"Day");
+    endyear  = ReplaceString.getParameter(request,"EndYear");
+    endmonth = ReplaceString.getParameter(request,"EndMonth");
+    endday   = ReplaceString.getParameter(request,"EndDay");
+
+    DateEdit  de = new DateEdit();
+
+    Calendar    calnd;
+
+    // 本日の日付取得
+    calnd = Calendar.getInstance();
+    today_year  = calnd.get(calnd.YEAR);
+    today_month = calnd.get(calnd.MONTH) + 1;
+    today_day   = calnd.get(calnd.DATE);
+    today_ymd   = today_year * 10000 + today_month * 100 + today_day;
+
+    if( year != null && month != null && day != null )
+    {
+        ymd = (Integer.valueOf(year).intValue() * 10000) + (Integer.valueOf(month).intValue() * 100) + Integer.valueOf(day).intValue();
+    }
+    else
+    {
+        if(DemoMode)
+        {
+            ownerinfo.Addupdate = today_ymd;
+        }
+        else
+        if (ownerinfo.Addupdate == 0) //計上日未取得のとき管理店舗1店舗目の計上日を取得する
+        {
+            Connection connection = null;
+            PreparedStatement prestate = null;
+            ResultSet result = null;
+            try
+            {
+                final String  query = "SELECT * FROM hotel,owner_user_hotel WHERE owner_user_hotel.hotelid = ? "
+                                    + "AND hotel.hotel_id = owner_user_hotel.accept_hotelid "
+                                    + "AND owner_user_hotel.userid = ? "
+                                    + "AND hotel.plan >= 1 "
+                                    + "AND hotel.plan <= 2 "
+                                    + "ORDER BY hotel.sort_num,hotel.hotel_id";
+
+                connection = DBConnection.getConnection();
+                prestate = connection.prepareStatement(query);
+                prestate.setString(1, loginHotelId);
+                prestate.setInt(2, ownerinfo.DbUserId);
+
+                result = prestate.executeQuery();
+                while(result.next())
+                {
+                    ownerinfo.sendPacket0100(1, result.getString("hotel.hotel_id"));
+                    if(ownerinfo.Addupdate != 0) break;
+                }
+            }
+            catch( Exception e )
+            {
+                Logging.error("foward Exception e=" + e.toString(), e);
+            }
+            finally
+            {
+                DBConnection.releaseResources(result, prestate, connection);
+            }
+        }
+        // 日付が設定されていない場合は現在計上日
+        ymd = ownerinfo.Addupdate;
+    }
+    int addup_date  = ownerinfo.Addupdate;
+
+    if( endyear != null && endmonth != null && endday != null )
+    {
+        rangeMode=true;
+        endymd = (Integer.valueOf(endyear).intValue() * 10000) + (Integer.valueOf(endmonth).intValue() * 100) + Integer.valueOf(endday).intValue();
+    }
+    else
+    {
+        endymd = ymd;
+    }
+
+    if( ymd != 0 )
+    {
+        int_startyear  = ymd / 10000;
+        int_startmonth = (ymd / 100 % 100) - 1;
+        int_startday   = ymd % 100;
+    }
+    if( endymd != 0 )
+    {
+        int_endyear  = endymd / 10000;
+        int_endmonth = (endymd / 100 % 100) - 1;
+        int_endday   = endymd % 100;
+    }
+
+    if (day != null)
+    {
+        if(day.equals("0"))
+        {
+            ymd = int_startyear * 10000 + (int_startmonth+1) * 100;
+        }
+        else if(day.equals("-1"))
+        {
+            ymd = de.addDay(ymd,-1);
+            endymd = ymd;
+        }
+    }
+    int[] last_day_s = new int[12];
+    last_day_s[0]  = 31;
+    last_day_s[1]  = 28;
+    if (((int_startyear % 4 == 0) && (int_startyear % 100 != 0)) || (int_startyear % 400 == 0))
+    {
+        last_day_s[1] = 29;
+    }
+    else
+    {
+        last_day_s[1] = 28;
+    }
+    last_day_s[2]  = 31;
+    last_day_s[3]  = 30;
+    last_day_s[4]  = 31;
+    last_day_s[5]  = 30;
+    last_day_s[6]  = 31;
+    last_day_s[7]  = 31;
+    last_day_s[8]  = 30;
+    last_day_s[9]  = 31;
+    last_day_s[10]  = 30;
+    last_day_s[11]  = 31;
+    int[]     last_day_e = new int[12];
+    last_day_e[0]  = 31;
+    last_day_e[1]  = 28;
+    if (((int_endyear % 4 == 0) && (int_endyear % 100 != 0)) || (int_endyear % 400 == 0))
+    {
+        last_day_e[1] = 29;
+    }
+    else
+    {
+        last_day_e[1] = 28;
+    }
+    last_day_e[2]   = 31;
+    last_day_e[3]   = 30;
+    last_day_e[4]   = 31;
+    last_day_e[5]   = 30;
+    last_day_e[6]   = 31;
+    last_day_e[7]   = 31;
+    last_day_e[8]   = 30;
+    last_day_e[9]   = 31;
+    last_day_e[10]  = 30;
+    last_day_e[11]  = 31;
+
+    int min_date = 20050101; // 最小日付
+    min_date     = Integer.parseInt(getMinDateString(Integer.toString(addup_date))); //5年前の日付
+
+    if( de.addMonth(ymd, 2) < endymd )
+    {
+        ownerinfo.SalesGetStartDate = 0;
+        ownerinfo.SalesGetEndDate = 0;
+%>
+2ヶ月以内の範囲指定で選択してください<br>
+（データ未取得）
+<hr class="border">
+<%
+    }
+    else if( rangeMode && ymd == today_ymd )
+    {
+        ownerinfo.SalesGetStartDate = 0;
+        ownerinfo.SalesGetEndDate = 0;
+%>
+日付範囲を指定してください<br>
+（データ未取得）
+<hr class="border"><%
+    }
+    else if( ymd < min_date )
+    {
+        ownerinfo.SalesGetStartDate = 0;
+        ownerinfo.SalesGetEndDate = 0;
+%>
+5年前より前の日付は入力できません<br>
+（データ未取得）
+<hr class="border"><%
+    }
+    else if( ymd > today_ymd )
+    {
+        ownerinfo.SalesGetStartDate = 0;
+        ownerinfo.SalesGetEndDate = 0;
+%>
+先の日付は入力できません<br>
+（データ未取得）
+<hr class="border">
+<%
+    }
+    else if( ymd > endymd )
+    {
+        ownerinfo.SalesGetStartDate = 0;
+        ownerinfo.SalesGetEndDate = 0;
+%>
+開始日付≦終了日付で入力してください<br>
+（データ未取得）
+<hr class="border">
+<%
+    }
+    else if(int_startday > last_day_s[int_startmonth])
+    {
+        ownerinfo.SalesGetStartDate = 0;
+        ownerinfo.SalesGetEndDate = 0;
+%>
+日付を正しく入力してください<br>
+（データ未取得）
+<hr class="border">
+<%
+    }
+    else if(int_endday > last_day_e[int_endmonth])
+    {
+        ownerinfo.SalesGetStartDate = 0;
+        ownerinfo.SalesGetEndDate = 0;
+%>
+日付を正しく入力してください<br>
+（データ未取得）
+<hr class="border">
+<%
+    }
+    else
+    {
+        ownerinfo.SalesGetStartDate = ymd;
+        ownerinfo.SalesGetEndDate = endymd;
+    }
+%>

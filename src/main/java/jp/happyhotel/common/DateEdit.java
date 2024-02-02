@@ -1,0 +1,1173 @@
+/*
+ * @(#)DateEdit.java 1.00 2007/07/23 Copyright (C) ALMEX Inc. 2007 日付･時間取得クラス
+ */
+
+package jp.happyhotel.common;
+
+import java.io.Serializable;
+import java.text.DateFormat;
+import java.text.DecimalFormat;
+import java.text.NumberFormat;
+import java.text.SimpleDateFormat;
+import java.util.Calendar;
+import java.util.Date;
+
+/**
+ * 現在日付・時刻の取得、編集を行います。
+ * 
+ * @author S.Shiiya
+ * @version 1.00 2007/07/23
+ */
+public class DateEdit implements Serializable
+{
+    /**
+     *
+     */
+    private static final long serialVersionUID = -2029503830926144208L;
+
+    /**
+     * 現在日付取得
+     * 
+     * @param type 取得タイプ(0:YYYY-MM-DD, 1:YYYY/MM/DD, 2:YYYYMMDD)
+     * @return 日付
+     */
+    public static String getDate(int type)
+    {
+        String buf;
+
+        Calendar cal = Calendar.getInstance();
+
+        int year = cal.get( Calendar.YEAR );
+        int month = cal.get( Calendar.MONTH ) + 1;
+        int day = cal.get( Calendar.DATE );
+
+        NumberFormat nf = new DecimalFormat( "00" );
+
+        switch( type )
+        {
+            case 0:
+                buf = year + "-" + nf.format( month ) + "-" + nf.format( day );
+                return(buf);
+
+            case 1:
+                buf = year + "/" + nf.format( month ) + "/" + nf.format( day );
+                return(buf);
+
+            case 2:
+            default:
+                buf = year + nf.format( month ) + nf.format( day );
+                return(buf);
+        }
+    }
+
+    /**
+     * 指定日付取得
+     * 
+     * @param type 取得タイプ(0:YYYY-MM-DD, 1:YYYY/MM/DD, 2:YYYYMMDD)
+     * @param year 年
+     * @param month 月
+     * @param day 日
+     * @return 日付
+     */
+    public static String getDate(int type, int year, int month, int day)
+    {
+        String buf;
+
+        NumberFormat nf = new DecimalFormat( "00" );
+
+        switch( type )
+        {
+            case 0:
+                buf = year + "-" + nf.format( month ) + "-" + nf.format( day );
+                return(buf);
+
+            case 1:
+                buf = year + "/" + nf.format( month ) + "/" + nf.format( day );
+                return(buf);
+
+            case 2:
+            default:
+                buf = year + nf.format( month ) + nf.format( day );
+                return(buf);
+        }
+    }
+
+    /**
+     * 現在時刻取得
+     * 
+     * @param type 取得タイプ(0:HH:MM:SS, 1:HHMMSS, 2:HH:MM, 3:HHMM)
+     * @return 時刻
+     */
+    public static String getTime(int type)
+    {
+        String buf;
+
+        Calendar cal = Calendar.getInstance();
+
+        int hour = cal.get( Calendar.HOUR_OF_DAY );
+        int minute = cal.get( Calendar.MINUTE );
+        int second = cal.get( Calendar.SECOND );
+
+        NumberFormat nf = new DecimalFormat( "00" );
+        switch( type )
+        {
+            case 0:
+                buf = hour + ":" + nf.format( minute ) + ":" + nf.format( second );
+                return(buf);
+
+            case 1:
+                buf = hour + nf.format( minute ) + nf.format( second );
+                return(buf);
+
+            case 2:
+                buf = hour + ":" + nf.format( minute );
+                return(buf);
+
+            case 3:
+            default:
+                buf = hour + nf.format( minute );
+                return(buf);
+        }
+    }
+
+    /**
+     * 指定日付取得
+     * 
+     * @param type 取得タイプ(0:YYYY-MM-DD, 1:YYYY/MM/DD, 2:YYYYMMDD,4:YYYY-MM-DD)
+     * @param year 年
+     * @param month 月
+     * @param day 日
+     * @return 日付
+     */
+    public static String getDate(int type, int date)
+    {
+        String buf;
+
+        NumberFormat nf = new DecimalFormat( "00" );
+        String strDate = String.format( "%8d", date );
+
+        int year = Integer.parseInt( strDate ) / 10000;
+        int month = Integer.parseInt( strDate ) / 100 % 100;
+        int day = Integer.parseInt( strDate ) % 100;
+
+        switch( type )
+        {
+            case 0:
+                buf = year + "-" + nf.format( month ) + "-" + nf.format( day );
+                return(buf);
+
+            case 1:
+                buf = year + "/" + nf.format( month ) + "/" + nf.format( day );
+                return(buf);
+
+            case 2:
+                buf = year + nf.format( month ) + nf.format( day );
+                return(buf);
+            case 3:
+                buf = year + "-" + nf.format( month ) + "-" + nf.format( day );
+                return(buf);
+
+            default:
+                buf = year + nf.format( month ) + nf.format( day );
+                return(buf);
+        }
+    }
+
+    /**
+     * 現在時刻取得
+     * 
+     * @param type 取得タイプ(0:HH:MM:SS, 1:HHMMSS, 2:HH:MM, 3:HHMM)
+     * @return 時刻
+     */
+    public static String getTime(int type, int time)
+    {
+        String buf;
+
+        Calendar cal = Calendar.getInstance();
+        String strTime = String.format( "%06d", time );
+
+        int hour = Integer.parseInt( strTime ) / 10000;
+        int minute = Integer.parseInt( strTime ) / 100 % 100;
+        int second = Integer.parseInt( strTime ) % 100;
+
+        NumberFormat nf = new DecimalFormat( "00" );
+        switch( type )
+        {
+            case 0:
+                buf = hour + ":" + nf.format( minute ) + ":" + nf.format( second );
+                return(buf);
+
+            case 1:
+                buf = hour + nf.format( minute ) + nf.format( second );
+                return(buf);
+
+            case 2:
+                buf = hour + ":" + nf.format( minute );
+                return(buf);
+
+            case 3:
+            default:
+                buf = hour + nf.format( minute );
+                return(buf);
+        }
+    }
+
+    /**
+     * 日付年数加算取得
+     * 
+     * @param ymd 基準日付(YYYYMMDD)
+     * @param add 加算年(±)
+     * @return 加算後日付(YYYYMMDD)
+     */
+    public static int addYear(int ymd, int add)
+    {
+        int retymd;
+        Calendar cal = Calendar.getInstance();
+
+        cal.set( Calendar.YEAR, (ymd / 10000) );
+        cal.set( Calendar.MONTH, (ymd / 100 % 100) - 1 );
+        cal.set( Calendar.DATE, (ymd % 100) );
+
+        cal.add( Calendar.YEAR, add );
+
+        retymd = cal.get( Calendar.YEAR ) * 10000 + (cal.get( Calendar.MONTH ) + 1) * 100 + cal.get( Calendar.DATE );
+
+        return(retymd);
+    }
+
+    /**
+     * 日付月数加算取得
+     * 
+     * @param ymd 基準日付(YYYYMMDD)
+     * @param add 加算月(±)
+     * @return 加算後日付(YYYYMMDD)
+     */
+    public static int addMonth(int ymd, int add)
+    {
+        int retymd;
+        Calendar cal = Calendar.getInstance();
+
+        cal.set( Calendar.YEAR, (ymd / 10000) );
+        cal.set( Calendar.MONTH, (ymd / 100 % 100) - 1 );
+        cal.set( Calendar.DATE, (ymd % 100) );
+
+        cal.add( Calendar.MONTH, add );
+
+        retymd = cal.get( Calendar.YEAR ) * 10000 + (cal.get( Calendar.MONTH ) + 1) * 100 + cal.get( Calendar.DATE );
+
+        return(retymd);
+    }
+
+    /**
+     * 日付日数加算取得
+     * 
+     * @param ymd 基準日付(YYYYMMDD)
+     * @param add 加算月(±)
+     * @return 加算後日付(YYYYMMDD)
+     */
+    public static int addDay(int ymd, int add)
+    {
+        int retymd;
+        Calendar cal = Calendar.getInstance();
+
+        cal.set( Calendar.YEAR, (ymd / 10000) );
+        cal.set( Calendar.MONTH, (ymd / 100 % 100) - 1 );
+        cal.set( Calendar.DATE, (ymd % 100) );
+
+        cal.add( Calendar.DATE, add );
+
+        retymd = cal.get( Calendar.YEAR ) * 10000 + (cal.get( Calendar.MONTH ) + 1) * 100 + cal.get( Calendar.DATE );
+
+        return(retymd);
+    }
+
+    /**
+     * 秒数加算取得
+     * 
+     * @param ymd 基準日付(YYYYMMDD)
+     * @param hms 基準時刻(HHMMSS)
+     * @param add 加算秒(±)
+     * @return ret[0]加算後日付(YYYYMMDD)
+     * @return ret[1]加算後時刻(HHMMSS)
+     */
+    public static int[] addSec(int ymd, int hsm, int add)
+    {
+        int ret[] = new int[2];
+        NumberFormat nf = new DecimalFormat( "00" );
+        Calendar cal = Calendar.getInstance();
+
+        cal.set( Calendar.YEAR, (ymd / 10000) );
+        cal.set( Calendar.MONTH, (ymd / 100 % 100) - 1 );
+        cal.set( Calendar.DATE, (ymd % 100) );
+        cal.set( Calendar.HOUR_OF_DAY, (hsm / 10000) );
+        cal.set( Calendar.MINUTE, (hsm / 100 % 100) );
+        cal.set( Calendar.SECOND, (hsm % 100) );
+
+        cal.add( Calendar.SECOND, add );
+
+        ret[0] = Integer.parseInt( (cal.get( Calendar.YEAR )) + nf.format( (cal.get( Calendar.MONTH ) + 1) ) + nf.format( cal.get( Calendar.DATE ) ) );
+        ret[1] = Integer.parseInt( (cal.get( Calendar.HOUR_OF_DAY )) + nf.format( (cal.get( Calendar.MINUTE )) ) + nf.format( cal.get( Calendar.SECOND ) ) );
+        return(ret);
+    }
+
+    /**
+     * 基準日付の月の最終日付を返す
+     * 
+     * @param date 基準日付(YYYYMMDD)
+     * @return 数値(YYYYMMDD)
+     */
+    public static int getLastDayOfMonth(int date)
+    {
+        Calendar cal;
+        int ret;
+
+        cal = Calendar.getInstance();
+        // 基準日の月の１日をセット
+        cal.set( date / 10000, (date / 100 % 100) - 1, 1 );
+        // 翌月
+        cal.add( Calendar.MONTH, 1 );
+        // 前日
+        cal.add( Calendar.DATE, -1 );
+
+        ret = cal.get( Calendar.YEAR ) * 10000 + (cal.get( Calendar.MONTH ) + 1) * 100 + cal.get( Calendar.DATE );
+        return ret;
+    }
+
+    /**
+     * 曜日名称取得
+     * 
+     * @param ymd 取得日付(YYYYMMDD)
+     * @return 曜日名
+     */
+    public static String getWeekName(int ymd)
+    {
+        Calendar cal = Calendar.getInstance();
+
+        cal.set( Calendar.YEAR, (ymd / 10000) );
+        cal.set( Calendar.MONTH, (ymd / 100 % 100) - 1 );
+        cal.set( Calendar.DATE, (ymd % 100) );
+
+        switch( cal.get( Calendar.DAY_OF_WEEK ) )
+        {
+            case Calendar.SUNDAY:
+                return("日");
+
+            case Calendar.MONDAY:
+                return("月");
+
+            case Calendar.TUESDAY:
+                return("火");
+
+            case Calendar.WEDNESDAY:
+                return("水");
+
+            case Calendar.THURSDAY:
+                return("木");
+
+            case Calendar.FRIDAY:
+                return("金");
+
+            case Calendar.SATURDAY:
+                return("土");
+
+            default:
+                return("");
+        }
+    }
+
+    /**
+     * 曜日Index取得
+     * 
+     * @param ymd 取得日付(YYYYMMDD)
+     * @return 曜日Index(0:日曜-6:土曜)
+     */
+    public static int getWeekIndex(int ymd)
+    {
+        Calendar cal = Calendar.getInstance();
+
+        cal.set( Calendar.YEAR, (ymd / 10000) );
+        cal.set( Calendar.MONTH, (ymd / 100 % 100) - 1 );
+        cal.set( Calendar.DATE, (ymd % 100) );
+
+        return(cal.get( Calendar.DAY_OF_WEEK ) - 1);
+    }
+
+    /**
+     * 日付の妥当性チェック
+     * 
+     * @param year 年(YYYY)
+     * @param month 年(MM)
+     * @param day 年(DD)
+     * @return 判別結果(true:正しい,false：正しくない)
+     */
+    public static boolean checkDate(int year, int month, int day)
+    {
+        boolean ret = false;
+        String date;
+        date = Integer.toString( year ) + "/" + Integer.toString( month ) + "/" + Integer.toString( day );
+
+        DateFormat format = DateFormat.getDateInstance();
+        // 日付/時刻解析を厳密に行うかどうかを設定する。
+        format.setLenient( false );
+
+        try
+        {
+            format.parse( date );
+            ret = true;
+        }
+        catch ( Exception e )
+        {
+            ret = false;
+        }
+
+        return(ret);
+    }
+
+    /**
+     * 日付の妥当性チェック
+     * 
+     * @param date 日付(YYYY/MM/DD またはYYYY-MM-DD)
+     * @return 判別結果(true:正しい,false：正しくない)
+     */
+    public static boolean checkDate(String date)
+    {
+        final int DATE_LENGTH = 8;
+        boolean ret = false;
+
+        // nullか空白だったらエラー
+        if ( (date != null) && (date.equals( "" ) == false) )
+        {
+            date = date.replace( '-', '/' );
+        }
+        else
+        {
+            return false;
+        }
+
+        DateFormat format = DateFormat.getDateInstance();
+        // 日付/時刻解析を厳密に行うかどうかを設定する。
+        format.setLenient( false );
+
+        if ( (CheckString.numCheck( date ) != false) && (date.length() == DATE_LENGTH) )
+        {
+            date = date.substring( 0, 4 ) + "/" + date.substring( 4, 6 ) + "/" + date.substring( 6 );
+        }
+
+        try
+        {
+            format.parse( date );
+            ret = true;
+        }
+        catch ( Exception e )
+        {
+            ret = false;
+        }
+
+        return(ret);
+    }
+
+    /**
+     * 時刻の妥当性チェック
+     * 
+     * @param time 時刻(HHMMSS)
+     * @return 判別結果(true:正しい,false：正しくない)
+     */
+    public static boolean checkTime(int time)
+    {
+        boolean ret = true;
+        String strTime = "";
+        int hour;
+        int minute;
+        int second;
+
+        // nullか空白だったらエラー
+        if ( (time < 0) && (time > 240000) )
+        {
+            return false;
+        }
+        strTime = String.format( "%06d", time );
+        try
+        {
+            hour = Integer.parseInt( strTime.substring( 0, 2 ) );
+            minute = Integer.parseInt( strTime.substring( 2, 4 ) );
+            second = Integer.parseInt( strTime.substring( 4, 6 ) );
+
+            // 0時から23時の範囲外だとエラー
+            if ( hour < 0 || hour > 23 )
+            {
+                ret = false;
+            }
+            // 0分から59分の範囲外だとエラー
+            if ( minute < 0 || minute > 59 )
+            {
+                ret = false;
+            }
+            // 0秒から59の範囲外だとエラー
+            if ( second < 0 || second > 59 )
+            {
+                ret = false;
+            }
+
+        }
+        catch ( Exception e )
+        {
+            ret = false;
+        }
+
+        return(ret);
+    }
+
+    /**
+     * 有効期限チェック(現在時間が有効期限内かどうかを確認)
+     * 
+     * @param date 基準日付(YYYYMMDDで指定)
+     * @param time 基準時間(HHMMSSで指定)
+     * @param kind 種別(0：年、1：月、2：日、3：時間、4：分、5：秒)
+     * @param elapsedTime 経過時間（単位はkindを参照）
+     * @return 判別結果(true:有効期限内,false：有効期限切れ)
+     */
+    public static boolean isValidDate(int date, int time, int kind, int elapsedTime)
+    {
+        int nResult;
+        int nYear;
+        int nMonth;
+        int nDay;
+        int nHour;
+        int nMinute;
+        int nSecond;
+        NumberFormat nf;
+        Calendar cal = Calendar.getInstance(); // 有効期限チェックを行うカレンダー
+        Calendar nowCal = Calendar.getInstance(); // 現在のカレンダー
+        String strCheckTime;
+
+        nYear = date / 10000;
+        nMonth = date % 10000 / 100 - 1;
+        nDay = date % 100;
+
+        // 時刻は6桁未満の場合があるので、フォーマット
+        nf = new DecimalFormat( "000000" );
+        strCheckTime = nf.format( time );
+        nHour = Integer.parseInt( strCheckTime.substring( 0, 2 ) );
+        nMinute = Integer.parseInt( strCheckTime.substring( 2, 4 ) );
+        nSecond = Integer.parseInt( strCheckTime.substring( 4, 6 ) );
+
+        cal.clear();
+        cal.set( nYear, nMonth, nDay, nHour, nMinute, nSecond );
+        // 経過時間があればカレンダーを操作する
+        if ( elapsedTime > 0 )
+        {
+            switch( kind )
+            {
+                case 0:
+                    cal.add( Calendar.YEAR, elapsedTime );
+                    break;
+                case 1:
+                    cal.add( Calendar.MONTH, elapsedTime );
+                    break;
+                case 2:
+                    cal.add( Calendar.DATE, elapsedTime );
+                    break;
+                case 3:
+                    cal.add( Calendar.HOUR_OF_DAY, elapsedTime );
+                    break;
+                case 4:
+                    cal.add( Calendar.MINUTE, elapsedTime );
+                    break;
+                case 5:
+                    cal.add( Calendar.SECOND, elapsedTime );
+                    break;
+                default:
+                    cal.add( Calendar.DATE, elapsedTime );
+                    break;
+            }
+        }
+
+        // 今の時間が期限切れ時間より進んでいたら有効期限切れ
+        nResult = cal.compareTo( nowCal );
+        if ( nResult == -1 )
+        {
+            return(false);
+        }
+        else if ( nResult == 0 || nResult == 1 )
+        {
+            return(true);
+        }
+        else
+        {
+            return(false);
+        }
+    }
+
+    /*****
+     * 有効期限チェック(現在時間が有効期限内かどうかを確認)
+     * 
+     * @param date 基準日付(YYYYMMDDで指定)
+     * @param time 基準時間(HHMMSSで指定)
+     * @param date2 基準日付(YYYYMMDDで指定)
+     * @param time2 基準時間(HHMMSSで指定)
+     * @param kind 種別(0：年、1：月、2：日、3：時間、4：分、5：秒)
+     * @param elapsedTime 経過時間（単位はkindを参照）
+     * @return
+     */
+    public static boolean isValidDate(int date, int time, int date2, int time2, int kind, int elapsedTime)
+    {
+        int nResult;
+        int nYear1;
+        int nYear2;
+        int nMonth1;
+        int nMonth2;
+        int nDay1;
+        int nDay2;
+        int nHour1;
+        int nHour2;
+        int nMinute1;
+        int nMinute2;
+        int nSecond1;
+        int nSecond2;
+        NumberFormat nf;
+        Calendar cal1 = Calendar.getInstance(); // 有効期限チェックを行うカレンダー
+        Calendar cal2 = Calendar.getInstance(); // チェックイン時の時刻
+        String strCheckTime;
+
+        // カレンダー1の日付・時刻をセットする
+        nYear1 = date / 10000;
+        nMonth1 = date % 10000 / 100 - 1;
+        nDay1 = date % 100;
+
+        // 時刻は6桁未満の場合があるので、フォーマット
+        nf = new DecimalFormat( "000000" );
+        strCheckTime = nf.format( time );
+        nHour1 = Integer.parseInt( strCheckTime.substring( 0, 2 ) );
+        nMinute1 = Integer.parseInt( strCheckTime.substring( 2, 4 ) );
+        nSecond1 = Integer.parseInt( strCheckTime.substring( 4, 6 ) );
+
+        cal1.clear();
+        cal1.set( nYear1, nMonth1, nDay1, nHour1, nMinute1, nSecond1 );
+
+        // カレンダー2の日付・時刻をセットする
+        nYear2 = date2 / 10000;
+        nMonth2 = date2 % 10000 / 100 - 1;
+        nDay2 = date2 % 100;
+
+        nf = new DecimalFormat( "000000" );
+        strCheckTime = nf.format( time2 );
+        nHour2 = Integer.parseInt( strCheckTime.substring( 0, 2 ) );
+        nMinute2 = Integer.parseInt( strCheckTime.substring( 2, 4 ) );
+        nSecond2 = Integer.parseInt( strCheckTime.substring( 4, 6 ) );
+
+        cal2.clear();
+        cal2.set( nYear2, nMonth2, nDay2, nHour2, nMinute2, nSecond2 );
+
+        // 経過時間があればカレンダーを操作する
+        if ( elapsedTime > 0 )
+        {
+            switch( kind )
+            {
+                case 0:
+                    cal1.add( Calendar.YEAR, elapsedTime );
+                    break;
+                case 1:
+                    cal1.add( Calendar.MONTH, elapsedTime );
+                    break;
+                case 2:
+                    cal1.add( Calendar.DATE, elapsedTime );
+                    break;
+                case 3:
+                    cal1.add( Calendar.HOUR_OF_DAY, elapsedTime );
+                    break;
+                case 4:
+                    cal1.add( Calendar.MINUTE, elapsedTime );
+                    break;
+                case 5:
+                    cal1.add( Calendar.SECOND, elapsedTime );
+                    break;
+                default:
+                    cal1.add( Calendar.DATE, elapsedTime );
+                    break;
+            }
+        }
+
+        // 今の時間が期限切れ時間より進んでいたら有効期限切れ
+        nResult = cal1.compareTo( cal2 );
+        if ( nResult == -1 )
+        {
+            return(false);
+        }
+        else if ( nResult == 0 || nResult == 1 )
+        {
+            return(true);
+        }
+        else
+        {
+            return(false);
+        }
+    }
+
+    /**
+     * 経過時間取得
+     * 
+     * @param date 基準日付(YYYYMMDDで指定)
+     * @param time 基準時間(HHMMSSで指定)
+     * @param kind 種別(0：年、1：月、2：日、3：時間、4：分、5：秒)
+     * @param elapsedTime 経過時間（単位はkindを参照）
+     * @return 判別結果(true:有効期限内,false：有効期限切れ)
+     */
+    public static String elapsedDate(int date, int time, int kind, int elapsedTime)
+    {
+        int nResult;
+        int nYear;
+        int nMonth;
+        int nDay;
+        int nHour;
+        int nMinute;
+        int nSecond;
+        NumberFormat nf;
+        Calendar cal = Calendar.getInstance(); // 有効期限チェックを行うカレンダー
+        Calendar nowCal = Calendar.getInstance(); // 現在のカレンダー
+        String strCheckTime;
+
+        nYear = date / 10000;
+        nMonth = date % 10000 / 100 - 1;
+        nDay = date % 100;
+
+        // 時刻は6桁未満の場合があるので、フォーマット
+        nf = new DecimalFormat( "000000" );
+        strCheckTime = nf.format( time );
+        nHour = Integer.parseInt( strCheckTime.substring( 0, 2 ) );
+        nMinute = Integer.parseInt( strCheckTime.substring( 2, 4 ) );
+        nSecond = Integer.parseInt( strCheckTime.substring( 4, 6 ) );
+
+        cal.clear();
+        cal.set( nYear, nMonth, nDay, nHour, nMinute, nSecond );
+        // 経過時間があればカレンダーを操作する
+        if ( elapsedTime != 0 )
+        {
+            switch( kind )
+            {
+                case 0:
+                    cal.add( Calendar.YEAR, elapsedTime );
+                    break;
+                case 1:
+                    cal.add( Calendar.MONTH, elapsedTime );
+                    break;
+                case 2:
+                    cal.add( Calendar.DATE, elapsedTime );
+                    break;
+                case 3:
+                    cal.add( Calendar.HOUR_OF_DAY, elapsedTime );
+                    break;
+                case 4:
+                    cal.add( Calendar.MINUTE, elapsedTime );
+                    break;
+                case 5:
+                    cal.add( Calendar.SECOND, elapsedTime );
+                    break;
+                default:
+                    cal.add( Calendar.DATE, elapsedTime );
+                    break;
+            }
+
+        }
+
+        int year = cal.get( Calendar.YEAR );
+        int month = cal.get( Calendar.MONTH ) + 1;
+        int day = cal.get( Calendar.DATE );
+
+        String strDate = Integer.toString( year ) + String.format( "%1$02d", month ) + String.format( "%1$02d", day );
+        try
+        {
+            return(strDate);
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[DateEdit.elapsedDate()]Exception:" + e.toString() );
+            return("");
+        }
+    }
+
+    /**
+     * 経過時間取得
+     * 
+     * @param date 基準日付(YYYYMMDDで指定)
+     * @param time 基準時間(HHMMSSで指定)
+     * @param kind 種別(0：年、1：月、2：日、3：時間、4：分、5：秒)
+     * @param elapsedTime 経過時間（単位はkindを参照）
+     * @return 判別結果(true:有効期限内,false：有効期限切れ)
+     */
+    public static String elapsedTime(int date, int time, int kind, int elapsedTime)
+    {
+        int nResult;
+        int nYear;
+        int nMonth;
+        int nDay;
+        int nHour;
+        int nMinute;
+        int nSecond;
+        NumberFormat nf;
+        Calendar cal = Calendar.getInstance(); // 有効期限チェックを行うカレンダー
+        Calendar nowCal = Calendar.getInstance(); // 現在のカレンダー
+        String strCheckTime;
+
+        nYear = date / 10000;
+        nMonth = date % 10000 / 100 - 1;
+        nDay = date % 100;
+
+        // 時刻は6桁未満の場合があるので、フォーマット
+        nf = new DecimalFormat( "000000" );
+        strCheckTime = nf.format( time );
+        nHour = Integer.parseInt( strCheckTime.substring( 0, 2 ) );
+        nMinute = Integer.parseInt( strCheckTime.substring( 2, 4 ) );
+        nSecond = Integer.parseInt( strCheckTime.substring( 4, 6 ) );
+
+        cal.clear();
+        cal.set( nYear, nMonth, nDay, nHour, nMinute, nSecond );
+        // 経過時間があればカレンダーを操作する
+        if ( elapsedTime != 0 )
+        {
+            switch( kind )
+            {
+                case 0:
+                    cal.add( Calendar.YEAR, elapsedTime );
+                    break;
+                case 1:
+                    cal.add( Calendar.MONTH, elapsedTime );
+                    break;
+                case 2:
+                    cal.add( Calendar.DATE, elapsedTime );
+                    break;
+                case 3:
+                    cal.add( Calendar.HOUR_OF_DAY, elapsedTime );
+                    break;
+                case 4:
+                    cal.add( Calendar.MINUTE, elapsedTime );
+                    break;
+                case 5:
+                    cal.add( Calendar.SECOND, elapsedTime );
+                    break;
+                default:
+                    cal.add( Calendar.DATE, elapsedTime );
+                    break;
+            }
+        }
+        int hour = cal.get( Calendar.HOUR_OF_DAY );
+        int minute = cal.get( Calendar.MINUTE );
+        int second = cal.get( Calendar.SECOND );
+
+        String strTime = String.format( "%1$02d", hour ) + String.format( "%1$02d", minute ) + String.format( "%1$02d", second );
+
+        try
+        {
+            return(strTime);
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[DateEdit.elapsedTime()]Exception:" + e.toString() );
+            return("");
+        }
+
+    }
+
+    /**
+     * 現在日付取得
+     * 
+     * @param type 取得タイプ(0:YYYY年MM月DD日(曜日), 1:MM月DD日(曜日), 3:YYYY年MM月DD日, 4:MM月DD日, 5:HH/MM/DD, 6:HH.MM.DD 7:YYYY/MM/DD(曜日))
+     * @return 日付
+     */
+    public static String formatDate(int type, int date)
+    {
+        String buf;
+        String week;
+
+        switch( type )
+        {
+            case 0:
+                buf = String.format( "%04d年%02d月%02d日", date / 10000, date % 10000 / 100, date % 100 );
+                week = DateEdit.getWeekName( date );
+                buf += "(" + week + ")";
+                return(buf);
+
+            case 1:
+                buf = String.format( "%02d月%02d日", date % 10000 / 100, date % 100 );
+                week = DateEdit.getWeekName( date );
+                buf += "(" + week + ")";
+                return(buf);
+
+            case 2:
+                buf = String.format( "%02d月%02d日", date % 10000 / 100, date % 100 );
+                week = DateEdit.getWeekName( date );
+                buf += "(" + week + ")";
+                return(buf);
+
+            case 3:
+                buf = String.format( "%04d年%02d月%02d日", date / 10000, date % 10000 / 100, date % 100 );
+                return(buf);
+
+            case 4:
+                buf = String.format( "%02d月%02d日", date % 10000 / 100, date % 100 );
+                return(buf);
+
+            case 5:
+                buf = String.format( "%04d/%02d/%02d", date / 10000, date % 10000 / 100, date % 100 );
+                return(buf);
+
+            case 6:
+                buf = String.format( "%04d.%02d.%02d", date / 10000, date % 10000 / 100, date % 100 );
+                return(buf);
+
+            case 7:
+                buf = String.format( "%04d/%02d/%02d", date / 10000, date % 10000 / 100, date % 100 );
+                week = DateEdit.getWeekName( date );
+                buf += "(" + week + ")";
+                return(buf);
+
+            default:
+                buf = String.format( "%04d.%02d.%02d", date / 10000, date % 10000 / 100, date % 100 );
+                return(buf);
+
+        }
+    }
+
+    /**
+     * 指定時刻取得
+     * 
+     * @param type 取得タイプ(0:HH:MM:SS, 1:HHMMSS, 2:HH:MM, 3:HHMM, 4:HH:MMの0埋め, 5:24時表記HH:MM, 6:HH時間MM分)
+     * @return 時刻
+     */
+    public static String formatTime(int type, int time)
+    {
+        String buf;
+
+        Calendar cal = Calendar.getInstance();
+        String strTime = String.format( "%06d", time );
+
+        int hour = Integer.parseInt( strTime.substring( 0, 2 ) );
+        int minute = Integer.parseInt( strTime.substring( 2, 4 ) );
+        int second = Integer.parseInt( strTime.substring( 4 ) );
+
+        NumberFormat nf = new DecimalFormat( "00" );
+        switch( type )
+        {
+            case 0:
+                buf = nf.format( hour ) + ":" + nf.format( minute ) + ":" + nf.format( second );
+                return(buf);
+
+            case 1:
+                buf = nf.format( hour ) + nf.format( minute ) + nf.format( second );
+                return(buf);
+
+            case 2:
+                buf = nf.format( hour ) + ":" + nf.format( minute );
+                return(buf);
+
+            case 3:
+                buf = nf.format( hour ) + nf.format( minute );
+                return(buf);
+            case 4:
+                buf = nf.format( hour ) + ":" + nf.format( minute );
+                return(buf);
+            case 5:
+                buf = nf.format( hour + 24 ) + ":" + nf.format( minute );
+                return(buf);
+            case 6:
+            default:
+                buf = hour + "時間";
+                if ( minute > 0 )
+                {
+                    buf += nf.format( minute ) + "分";
+                }
+                return(buf);
+
+        }
+    }
+
+    /**
+     * 祝日名称取得
+     * 
+     * @param date　日付
+     * @return 祝日名称
+     */
+    /* 2015.04.17 sakurai 祝日法改正により、20150811より「山の日」追加 */
+    public static String getHolidayName(int date)
+    {
+        String[][] nationalHolidaysA = {
+                { "0101", "元旦" },
+                { "0102", "正月" },
+                { "0103", "正月" },
+                { "0211", "建国記念の日" },
+                { "0429", "昭和の日" },
+                { "0503", "憲法記念日" },
+                { "0504", "みどりの日" },
+                { "0505", "こどもの日" },
+                { "1103", "文化の日" },
+                { "1123", "勤労感謝の日" }
+        };
+        String[][] nationalHolidaysB = {
+                { "20120109", "成人の日" },
+                { "20120320", "春分の日" },
+                { "20120430", "振替休日" },
+                { "20120716", "海の日" },
+                { "20120917", "敬老の日" },
+                { "20120922", "秋分の日" },
+                { "20121008", "体育の日" },
+                { "20121223", "天皇誕生日" },
+                { "20121224", "振替休日" },
+                { "20130114", "成人の日" },
+                { "20130320", "春分の日" },
+                { "20130506", "振替休日" },
+                { "20130715", "海の日" },
+                { "20130916", "敬老の日" },
+                { "20130923", "秋分の日" },
+                { "20131014", "体育の日" },
+                { "20131104", "振替休日" },
+                { "20131223", "天皇誕生日" },
+                { "20140113", "成人の日" },
+                { "20140321", "春分の日" },
+                { "20140506", "振替休日" },
+                { "20140721", "海の日" },
+                { "20140915", "敬老の日" },
+                { "20140923", "秋分の日" },
+                { "20141013", "体育の日" },
+                { "20141124", "振替休日" },
+                { "20141223", "天皇誕生日" },
+                { "20150112", "成人の日" },
+                { "20150321", "春分の日" },
+                { "20150506", "振替休日" },
+                { "20150720", "海の日" },
+                { "20150921", "敬老の日" },
+                { "20150922", "国民の休日" },
+                { "20150923", "秋分の日" },
+                { "20151012", "体育の日" },
+                { "20151223", "天皇誕生日" },
+                { "20160111", "成人の日" },
+                { "20160320", "春分の日" },
+                { "20160321", "振替休日" },
+                { "20160718", "海の日" },
+                { "20160811", "山の日" },
+                { "20160919", "敬老の日" },
+                { "20160922", "秋分の日" },
+                { "20161010", "体育の日" },
+                { "20161223", "天皇誕生日" },
+                { "20170109", "成人の日" },
+                { "20170320", "春分の日" },
+                { "20170717", "海の日" },
+                { "20170811", "山の日" },
+                { "20170918", "敬老の日" },
+                { "20170923", "秋分の日" },
+                { "20171009", "体育の日" },
+                { "20171223", "天皇誕生日" },
+                { "20180108", "成人の日" },
+                { "20180212", "振替休日" },
+                { "20180321", "春分の日" },
+                { "20180430", "振替休日" },
+                { "20180716", "海の日" },
+                { "20180811", "山の日" },
+                { "20180917", "敬老の日" },
+                { "20180923", "秋分の日" },
+                { "20180924", "振替休日" },
+                { "20181008", "体育の日" },
+                { "20181223", "天皇誕生日" },
+                { "20181224", "振替休日" },
+                { "20190114", "成人の日" },
+                { "20190321", "春分の日" },
+                { "20190430", "国民の休日" },
+                { "20190501", "天皇の即位の日" },
+                { "20190502", "国民の休日" },
+                { "20190506", "振替休日" },
+                { "20190715", "海の日" },
+                { "20190811", "山の日" },
+                { "20190812", "振替休日" },
+                { "20190916", "敬老の日" },
+                { "20190923", "秋分の日" },
+                { "20191014", "体育の日" },
+                { "20191022", "即位礼正殿の儀の行われる日" },
+                { "20191104", "振替休日" },
+                { "20200113", "成人の日" },
+                { "20200223", "天皇誕生日" },
+                { "20200224", "振替休日" },
+                { "20200320", "春分の日" },
+                { "20200506", "振替休日" },
+                { "20200723", "海の日" },
+                { "20200724", "スポーツの日" },
+                { "20200810", "山の日" },
+                { "20200921", "敬老の日" },
+                { "20200922", "秋分の日" },
+                { "20210111", "成人の日" },
+                { "20210223", "天皇誕生日" },
+                { "20210320", "春分の日" },
+                { "20210722", "海の日" },
+                { "20210723", "スポーツの日" },
+                { "20210808", "山の日" },
+                { "20210809", "振替休日" },
+                { "20210920", "敬老の日" },
+                { "20210923", "秋分の日" },
+                { "20220110", "成人の日" },
+                { "20220223", "天皇誕生日" },
+                { "20220321", "春分の日" },
+                { "20220718", "海の日" },
+                { "20220811", "山の日" },
+                { "20220919", "敬老の日" },
+                { "20220923", "秋分の日" },
+                { "20221010", "スポーツの日" },
+                { "20230109", "成人の日" },
+                { "20230223", "天皇誕生日" },
+                { "20230321", "春分の日" },
+                { "20230717", "海の日" },
+                { "20230811", "山の日" },
+                { "20230918", "敬老の日" },
+                { "20230923", "秋分の日" },
+                { "20231009", "スポーツの日" }
+        };
+        String d = Integer.toString( date ).substring( 4, 8 );
+        for( int i = 0 ; i < nationalHolidaysB.length ; i++ )
+        {
+            if ( nationalHolidaysB[i][0].equals( Integer.toString( date ) ) )
+            {
+                return nationalHolidaysB[i][1];
+            }
+        }
+        for( int i = 0 ; i < nationalHolidaysA.length ; i++ )
+        {
+            if ( nationalHolidaysA[i][0].equals( d ) )
+            {
+                return nationalHolidaysA[i][1];
+            }
+        }
+        return "";
+    }
+
+    /**
+     * 指定日は祝日か？
+     * 
+     * @param date 基準日付(YYYYMMDDで指定)
+     * @return
+     */
+    public static boolean isHoliday(int date)
+    {
+        // 文字列が返ってきたらtrue
+        return(0 != getHolidayName( date ).length());
+    }
+
+    /**
+     * 日数取得
+     * 
+     * @param date 開始日(YYYYMMDDで指定)
+     * @param dateTo 終了日(YYYYMMDDで指定)
+     * @return 日数
+     */
+    public static int differenceDays(int dateFrom, int dateTo) throws Exception
+    {
+
+        SimpleDateFormat simpleDateFormat = new SimpleDateFormat();
+        simpleDateFormat.setLenient( false );
+        simpleDateFormat.applyPattern( "yyyyMMdd" );
+        Date date1 = simpleDateFormat.parse( String.valueOf( dateFrom ) );
+        Date date2 = simpleDateFormat.parse( String.valueOf( dateTo ) );
+        long datetime1 = date1.getTime();
+        long datetime2 = date2.getTime();
+        long one_date_time = 1000 * 60 * 60 * 24;
+        long diffDays = (datetime2 - datetime1) / one_date_time;
+        return (int)diffDays;
+
+    }
+
+}

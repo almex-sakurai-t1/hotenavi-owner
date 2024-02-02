@@ -1,0 +1,466 @@
+package jp.happyhotel.action;
+
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.util.ArrayList;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.CheckString;
+import jp.happyhotel.common.DBConnection;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.common.Message;
+import jp.happyhotel.common.OwnerRsvCommon;
+import jp.happyhotel.common.ReplaceString;
+import jp.happyhotel.common.ReserveCommon;
+import jp.happyhotel.owner.FormOwnerBkoMenu;
+import jp.happyhotel.owner.FormOwnerRsvRoom;
+import jp.happyhotel.owner.FormOwnerRsvRoomManage;
+import jp.happyhotel.owner.LogicOwnerBkoMenu;
+import jp.happyhotel.owner.LogicOwnerRsvRoom;
+import jp.happyhotel.owner.LogicOwnerRsvRoomManage;
+
+/**
+ * 
+ * 部屋設定画面
+ * 部屋設定内容を更新する。
+ */
+public class ActionOwnerRsvRoom extends BaseAction
+{
+
+    private RequestDispatcher requestDispatcher = null;
+
+    private static final int  SEARCH_ALL        = 1;
+    private static final int  SEARCH_SEQ        = 2;
+
+    private static final int  menuFlg           = 71;
+    private static final int  menuFlg_Menu      = 7;
+
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        FormOwnerRsvRoom frmRoom;
+        FormOwnerBkoMenu frmMenu;
+        LogicOwnerRsvRoom logic;
+        int paramHotelID = 0;
+        int paramSeq = 0;
+        String paramRoomNm = "";
+        String paramRoomPr = "";
+        String paramRoomTxt = "";
+        int paramUserId = 0;
+        int paramRoomRnk = 0;
+        String paraOwnerHotelID = "";
+
+        int hotelId = 0;
+        String hotenaviID = "";
+        ArrayList<Integer> eqIdList = new ArrayList<Integer>();
+        boolean frmSetFlg = false;
+        String errMsg = "";
+        int disptype = 0;
+        int imediaflag = 0;
+        int adminflag = 0;
+        LogicOwnerBkoMenu logicMenu = new LogicOwnerBkoMenu();
+
+        try
+        {
+            frmRoom = new FormOwnerRsvRoom();
+            frmMenu = new FormOwnerBkoMenu();
+            logic = new LogicOwnerRsvRoom();
+
+            // 画面の値を取得
+            if ( request.getParameter( "selHotelIDValue" ) != null )
+            {
+                paramHotelID = Integer.parseInt( request.getParameter( "selHotelIDValue" ).toString() );
+            }
+            paramSeq = Integer.parseInt( request.getParameter( "seq" ).toString() );
+            paramRoomRnk = Integer.parseInt( request.getParameter( "roomRank" ) );
+            paramRoomNm = request.getParameter( "roomNm" ).toString();
+            paramRoomPr = request.getParameter( "roomPr" ).toString();
+            paramRoomTxt = request.getParameter( "roomText" ).toString();
+            paramUserId = OwnerRsvCommon.getCookieLoginUserId( request.getCookies() );
+            paraOwnerHotelID = OwnerRsvCommon.getCookieLoginHotenavi( request.getCookies() );
+
+            logicMenu.setFrm( new FormOwnerBkoMenu() );
+            disptype = logicMenu.getUserAuth( paraOwnerHotelID, paramUserId );
+            adminflag = logicMenu.getAdminFlg( paraOwnerHotelID, paramUserId );
+            imediaflag = OwnerRsvCommon.getImediaFlag( paraOwnerHotelID, paramUserId );
+
+            if ( (imediaflag == 1 && adminflag == 1 && paraOwnerHotelID.equals( "happyhotel" )) == false && disptype != OwnerRsvCommon.USER_AUTH_OWNER && disptype != OwnerRsvCommon.USER_AUTH_DEMO && disptype != OwnerRsvCommon.USER_AUTH_CALLCENTER )
+            {
+                // 権限のないユーザはエラーページを表示する
+                errMsg = Message.getMessage( "erro.30001", "ページを閲覧する権限" );
+                request.setAttribute( "errMsg", errMsg );
+                requestDispatcher = request.getRequestDispatcher( request.getContextPath() + "/reserve/reserve_error_PC.jsp" );
+                requestDispatcher.forward( request, response );
+                return;
+            }
+
+            String equipIDs[] = request.getParameterValues( "equipID" );
+            if ( equipIDs != null )
+            {
+                for( int i = 0 ; i < equipIDs.length ; i++ )
+                {
+                    eqIdList.add( Integer.parseInt( equipIDs[i] ) );
+                }
+            }
+
+            // 取得した値をFormにセット
+            frmRoom.setSelHotelID( paramHotelID );
+            frmRoom.setRoomRank( paramRoomRnk );
+            frmRoom.setSeq( paramSeq );
+            frmRoom.setRoomNameInput( paramRoomNm );
+            frmRoom.setRoomPRInput( paramRoomPr );
+            frmRoom.setRoomTextInput( paramRoomTxt );
+            frmRoom.setOwnerHotelID( paraOwnerHotelID );
+            frmRoom.setUserID( paramUserId );
+            frmRoom.setEquipIdList( eqIdList );
+
+            if ( request.getParameter( "btnBack" ) != null )
+            {
+                // ▼戻る
+                LogicOwnerRsvRoomManage logicRM = new LogicOwnerRsvRoomManage();
+                FormOwnerRsvRoomManage frmRoomManage = new FormOwnerRsvRoomManage();
+                frmRoomManage.setSelHotelID( paramHotelID );
+                frmRoomManage.setUserId( paramUserId );
+
+                logicRM.setFrm( frmRoomManage );
+                logicRM.getRoomData();
+
+                OwnerRsvCommon.setMenu( frmMenu, paramHotelID, menuFlg_Menu, request.getCookies() );
+
+                request.setAttribute( "FORM_RoomManage", logicRM.getFrm() );
+                request.setAttribute( "FORM_Menu", frmMenu );
+                requestDispatcher = request.getRequestDispatcher( "owner_rsv_base.jsp" );
+                requestDispatcher.forward( request, response );
+                return;
+            }
+
+            // ▼部屋情報設定更新
+            // 入力チェック
+            if ( isInputCheckMsg( frmRoom ) == true )
+            {
+                if ( disptype == OwnerRsvCommon.USER_AUTH_CALLCENTER && (imediaflag == 1 && adminflag == 1 && paraOwnerHotelID.equals( "happyhotel" )) == false )
+                {
+                    // 権限のないユーザはエラーページを表示する
+                    errMsg = Message.getMessage( "erro.30001", "ステータスを更新する権限" );
+                    request.setAttribute( "errMsg", errMsg );
+                    requestDispatcher = request.getRequestDispatcher( request.getContextPath() + "/reserve/reserve_error_PC.jsp" );
+                    requestDispatcher.forward( request, response );
+                    return;
+                }
+                // データの更新
+                logic.setFrm( frmRoom );
+                logic.registEquip();
+                frmSetFlg = true;
+                // 履歴
+                OwnerRsvCommon.addAdjustmentHistory( paramHotelID, OwnerRsvCommon.getCookieLoginHotenavi( request.getCookies() ),
+                                    paramUserId, OwnerRsvCommon.ADJUST_EDIT_ID_ROOM, paramSeq, OwnerRsvCommon.ADJUST_MEMO_ROOM );
+                // 販売・レンタル以外のホテル機器設定への影響の確認と更新
+                execHotelEquip( paramHotelID );
+            }
+            // メニュー、予約情報の設定
+            frmMenu.setUserId( paramUserId );
+            OwnerRsvCommon.setMenu( frmMenu, paramHotelID, menuFlg, request.getCookies() );
+            setPage( frmRoom, paramHotelID, paramSeq, eqIdList );
+
+            // ホテナビID取得
+            hotenaviID = logic.getHotenaviID( paramHotelID );
+            frmRoom.setHotenaviID( hotenaviID );
+
+            // 入力エラーの場合、入力値は保持する
+            if ( frmSetFlg == false )
+            {
+                frmRoom.setRoomNameInput( paramRoomNm );
+                frmRoom.setRoomPRInput( paramRoomPr );
+                frmRoom.setRoomTextInput( paramRoomTxt );
+            }
+
+            // 画面遷移
+            request.setAttribute( "FORM_Menu", frmMenu );
+            request.setAttribute( "FORM_Room", frmRoom );
+            requestDispatcher = request.getRequestDispatcher( "owner_rsv_base.jsp" );
+            requestDispatcher.forward( request, response );
+
+        }
+        catch ( Exception exception )
+        {
+            Logging.error( "[ActionOwnerRsvRoom.execute() ][hotelId = " + hotelId + "] Exception", exception );
+            try
+            {
+                errMsg = Message.getMessage( "erro.30005" );
+                request.setAttribute( "errMsg", errMsg );
+                requestDispatcher = request.getRequestDispatcher( request.getContextPath() + "/reserve/reserve_error_PC.jsp" );
+                requestDispatcher.forward( request, response );
+            }
+            catch ( Exception subException )
+            {
+                Logging.error( "[ActionOwnerRsvRoom.execute() ] - Unable to dispatch....."
+                        + subException.toString() );
+            }
+        }
+        finally
+        {
+            logic = null;
+        }
+    }
+
+    /**
+     * ホテル機器DB設定更新
+     * 
+     * @param id ホテルID
+     */
+    private void execHotelEquip(int id)
+    {
+        ArrayList<Integer> equipIdList = new ArrayList<Integer>();
+        ReserveCommon rsvcomm = new ReserveCommon();
+        String query = "";
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+        int hotelEquipValue = 0;
+
+        try
+        {
+            equipIdList = getEquipList( id );
+            // 取得した機器ごとの部屋割当状況を見てhotelEquipを更新する
+            for( int i = 0 ; i < equipIdList.size() ; i++ )
+            {
+                query = "select count(*) as count from hh_rsv_rel_room_equip where id = ? and equip_id = ?";
+                connection = DBConnection.getConnection();
+                prestate = connection.prepareStatement( query );
+                prestate.setInt( 1, id );
+                prestate.setInt( 2, equipIdList.get( i ) );
+                result = prestate.executeQuery();
+                if ( result.next() != false )
+                {
+                    if ( result.getInt( "count" ) == 0 )
+                    {
+                        // なし
+                        hotelEquipValue = 9;
+                    }
+                    else if ( result.getInt( "count" ) == rsvcomm.getRoomCnt( id ) )
+                    {
+                        // 全室
+                        hotelEquipValue = 1;
+                    }
+                    else
+                    {
+                        // 一部
+                        hotelEquipValue = 2;
+                    }
+                    // DB更新
+                    execUpdateHotelEquip( id, equipIdList.get( i ), hotelEquipValue );
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+        }
+        finally
+        {
+        }
+
+        return;
+    }
+
+    /**
+     * ホテル機器DB設定更新
+     * 
+     * @param id ホテルID
+     * @param equipId 機器ID
+     * @param equipType 機器種別
+     */
+    private void execUpdateHotelEquip(int id, int equipId, int equipType)
+    {
+        String query = "";
+        Connection connection = null;
+        PreparedStatement prestate = null;
+
+        try
+        {
+            query = "UPDATE research_hotel_equip SET ";
+            query = query + " equip_type = ? ";
+            query = query + " WHERE id = ? AND equip_id = ?";
+            connection = DBConnection.getConnection();
+            prestate = connection.prepareStatement( query );
+
+            prestate.setInt( 1, equipType );
+            prestate.setInt( 2, id );
+            prestate.setInt( 3, equipId );
+
+            if ( prestate.executeUpdate() > 0 )
+            {
+                query = "UPDATE hh_hotel_equip SET ";
+                query = query + " equip_type = ?,";
+                query = query + " WHERE id = ? AND equip_id = ?";
+
+                prestate = connection.prepareStatement( query );
+                prestate.setInt( 1, equipType );
+                prestate.setInt( 2, id );
+                prestate.setInt( 3, equipId );
+                prestate.executeUpdate();
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionOwnerRsvRoom.execUpdateHotelEquip() ][hotelId = " + id + "] Exception", e );
+        }
+        finally
+        {
+            DBConnection.releaseResources( prestate );
+            DBConnection.releaseResources( connection );
+        }
+
+        return;
+    }
+
+    /**
+     * 機器IDリスト取得処理(販売・レンタルは除く)
+     * 
+     * @param id ホテルID
+     * @return 機器IDリスト
+     */
+    private ArrayList<Integer> getEquipList(int id)
+    {
+        ArrayList<Integer> equipIdList = new ArrayList<Integer>();
+        String query = "";
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+
+        // 販売・レンタル以外の機器設定を取得
+        try
+        {
+            query = query + "SELECT ";
+            query = query + "hotelEq.equip_id, masterEq.name, masterEq.input_flag6, masterEq.sort_display, reHotelEq.equip_type, masterEq.branch_name1, masterEq.input_flag2, hotelEq.equip_rental ";
+            query = query + "FROM hh_hotel_equip hotelEq ";
+            query = query + "  LEFT JOIN hh_master_equip masterEq ON hotelEq.equip_id = masterEq.equip_id ";
+            query = query + "  LEFT JOIN research_hotel_equip reHotelEq ON hotelEq.id = reHotelEq.id AND hotelEq.equip_id = reHotelEq.equip_id ";
+            query = query + "WHERE hotelEq.id = ? ";
+            query = query + "ORDER BY masterEq.branch_name1, masterEq.input_flag2, masterEq.input_flag6, masterEq.sort_display ";
+
+            connection = DBConnection.getConnection();
+            prestate = connection.prepareStatement( query );
+            prestate.setInt( 1, id );
+            result = prestate.executeQuery();
+            while( result.next() != false )
+            {
+                if ( ReplaceString.HTMLEscape( CheckString.checkStringForNull( result.getString( "branch_name1" ) ) ).equals( "販売" ) == false && result.getInt( "equip_rental" ) != 1 )
+                {
+                    equipIdList.add( result.getInt( "equip_id" ) );
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionOwnerRsvRoom.execHotelEquip() ][hotelId = " + id + "] Exception", e );
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+        }
+        return(equipIdList);
+    }
+
+    /**
+     * 入力値チェック
+     * 
+     * @param frm FormOwnerRsvRoomオブジェクト
+     * @return true:正常、false:エラーあり
+     */
+    private boolean isInputCheckMsg(FormOwnerRsvRoom frm) throws Exception
+    {
+        int ret = 0;
+        String msg;
+        boolean isCheck = false;
+
+        msg = "";
+
+        // 部屋名称
+        if ( CheckString.onlySpaceCheck( frm.getRoomNameInput() ) == true )
+        {
+            // 未入力・空白文字の場合
+            msg = msg + Message.getMessage( "warn.00001", "部屋名称" ) + "<br />";
+        }
+        else
+        {
+            ret = OwnerRsvCommon.LengthCheck( frm.getRoomNameInput().trim(), 40 );
+            if ( ret == 1 )
+            {
+                // 桁数Overの場合
+                msg = msg + Message.getMessage( "warn.00038", "部屋名称", "20" ) + "<br />";
+            }
+        }
+
+        // 部屋PR
+        ret = OwnerRsvCommon.LengthCheck( frm.getRoomPRInput().trim(), 100 );
+        if ( ret == 1 )
+        {
+            // 桁数Overの場合
+            msg = msg + Message.getMessage( "warn.00038", "部屋PR", "50" ) + "<br />";
+        }
+
+        // その他設備・設備備考
+        ret = OwnerRsvCommon.LengthCheck( frm.getRoomTextInput().trim(), 300 );
+        if ( ret == 1 )
+        {
+            // 桁数Overの場合
+            msg = msg + Message.getMessage( "warn.00038", "その他設備・設備備考", "150" ) + "<br />";
+        }
+
+        frm.setErrMsg( msg );
+
+        if ( msg.trim().length() == 0 )
+        {
+            isCheck = true;
+        }
+
+        return isCheck;
+    }
+
+    /**
+     * 部屋設定画面を設定する
+     * 
+     * @param frm FormOwnerRsvRoomオブジェクト
+     * @param selHotelID 選択されているホテルID
+     * @param seq 選択されている部屋管理番号
+     * @param eqIdList 選択されている設備ID
+     * @return なし
+     */
+    private void setPage(FormOwnerRsvRoom frm, int selHotelID, int seq, ArrayList<Integer> eqIdList) throws Exception
+    {
+        LogicOwnerRsvRoom logic = new LogicOwnerRsvRoom();
+        ArrayList<Integer> selEquipIdList = new ArrayList<Integer>();
+
+        try
+        {
+            frm.setSelHotelID( selHotelID );
+            frm.setSeq( seq );
+            logic.setFrm( frm );
+
+            // 部屋情報の取得
+            logic.setFrm( frm );
+            logic.getRoomDetailData();
+
+            // ホテルの設備情報の取得
+            logic.getEquip( SEARCH_ALL );
+
+            // 部屋の設備情報の取得
+            logic.getEquip( SEARCH_SEQ );
+
+            // 選択済み設備IDの設定
+            selEquipIdList = OwnerRsvCommon.setSelEqList( frm.getAllEquipIdList(), eqIdList );
+
+            frm.setSelEqCheckList( selEquipIdList );
+
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionOwnerRsvRoom.setPage() ] " + e.getMessage() );
+            throw new Exception( "[ActionOwnerRsvRoom.setPage() ] " + e.getMessage() );
+        }
+    }
+}

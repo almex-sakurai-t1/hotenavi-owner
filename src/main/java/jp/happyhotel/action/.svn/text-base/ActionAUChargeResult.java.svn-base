@@ -1,0 +1,319 @@
+package jp.happyhotel.action;
+
+import java.io.IOException;
+import java.net.SocketTimeoutException;
+import java.net.URLDecoder;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.StringTokenizer;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.common.SelectCookie;
+import jp.happyhotel.data.DataUserSp;
+import jp.happyhotel.user.UserRegistAUSp;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.HttpVersion;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+/**
+ * 
+ * 継続課金情報登録用サーブレット
+ * 
+ * 継続情報登録が正常に完了した場合、このサーブレットが呼び出されるとします。
+ * オーソリ＆売上確定要求用電文の送受信には『Jakarta Commons HttpClient3.1』を使用。
+ */
+public class ActionAUChargeResult extends BaseAction
+{
+
+    /**
+     *
+     */
+    private static final long   serialVersionUID  = 8361956393383143181L;
+    private static final String PROVIDER_CODE     = "67812";
+    private static final String SERVICE_CODE      = "10003";
+    private static final String SECURE_KEY        = "r1l9AB5u1MOi0Pe9dfsGjUi9RtDiFgmJ";
+    private RequestDispatcher   requestDispatcher = null;
+
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        boolean ret = false;
+        String openId = "";
+        String tranId = "";
+        // 決済OK時にセットする変数
+        String continueAccountId = "";
+        String memberManageNo = "";
+        String processDay = "";
+        String processTime = "";
+
+        DataUserSp dus;
+        UserRegistAUSp registAu;
+        try
+        {
+            dus = new DataUserSp();
+            openId = SelectCookie.getCookieValue( request, "hhauhappy" );
+            tranId = request.getParameter( "transactionId" );
+            Logging.info( "[ActionAuChargeResult] openId:" + openId + ", transactionId:" + tranId );
+            Logging.info( "[ActionAuChargeResult]encoded transactionId:" + tranId );
+
+            // HTTP Client 3.1 を使用することを前提とします。
+            HttpClient client = new HttpClient();
+            client.getParams().setVersion( HttpVersion.HTTP_1_1 );
+            client.getParams().setSoTimeout( 300000 );
+            client.getHttpConnectionManager().getParams().setConnectionTimeout( 300000 );
+            client.getParams().setContentCharset( "UTF-8" );
+
+            // POSTメソッドを用いてアクセスする。
+            PostMethod post = new PostMethod( "https://connect.auone.jp/net/py/mpl_rt_net/cca" );
+
+            // リクエストパラメータを設定します。
+            // パラメータ名は大文字、小文字を区別する為、
+            // 正確に設定する必要があります。
+            // 原則として、送信パラメータはＵＲＬエンコードする必要があります。
+            post.addParameter( "ID", "ContBill" );
+            post.addParameter( "memberId", PROVIDER_CODE );
+            post.addParameter( "serviceId", SERVICE_CODE );
+            post.addParameter( "secureKey", SECURE_KEY );
+            post.addParameter( "transactionId", tranId );
+
+            // リクエストヘッダを設定します。
+            //
+            // 以下項目は HTTP-Client により自動的に設定される為、明示的に設定しません。
+            //
+            // ・Host
+            // ・Connection
+            // ・Content-Length
+            //
+            // ※ Content-Type も自動的に設定されますが、「; charset=UTF-8」部分が設定されない為
+            // 明示的に設定を行っています。
+            //
+            // 設定内容の詳細につきましては、Ｉ／Ｆ仕様書に従ってください
+            //
+            post.setRequestHeader( "Accept-Charset", "UTF-8" );
+            post.setRequestHeader( "Content-Type", "application/x-www-form-urlencoded; charset=UTF-8" );
+
+            // 継続情報登録
+            String responseBody = "";
+            try
+            {
+                int status = client.executeMethod( post );
+                Logging.info( "[ActionAuChargeResult] status:" + status );
+                Logging.info( "[ActionAuChargeResult] X-ResultCd:" + post.getResponseHeader( "X-ResultCd" ).getValue() );
+
+                // レスポンスが正しく返ってきているか確認します。
+                if ( HttpStatus.SC_OK != status )
+                {
+                    requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                    requestDispatcher.forward( request, response );
+                    return;
+                }
+
+                // MPL30000なら再度認証しなおし
+                if ( "MPL30000".equals( post.getResponseHeader( "X-ResultCd" ).getValue() ) != false )
+                {
+                    response.sendRedirect( "auAuthnService.act?loginop=p_reg" );
+                    return;
+                }
+
+                // 決済認可要求の処理結果を確認します。
+                if ( "MPL01000".equals( post.getResponseHeader( "X-ResultCd" ).getValue() ) == false )
+                {
+                    // (b) 継続情報登録エラー処理
+                    requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                    requestDispatcher.forward( request, response );
+                    return;
+                }
+
+                // 正常終了しているので、リクエストボディ部分を取り出します。
+                responseBody = post.getResponseBodyAsString();
+
+            }
+            catch ( SocketTimeoutException e )
+            {
+                this.operateCancelContBill( tranId );
+                requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                requestDispatcher.forward( request, response );
+                return;
+            }
+            catch ( HttpException e )
+            {
+                requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                requestDispatcher.forward( request, response );
+                return;
+            }
+            catch ( IOException e )
+            {
+                requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                requestDispatcher.forward( request, response );
+                return;
+            }
+            finally
+            {
+                // 以降、応答電文を使用しないため、コネクションをリリースします。
+                post.releaseConnection();
+            }
+
+            // 応答電文を解析し、処理結果を取り出します。
+            // 応答電文は以下の形式です。値はＵＲＬエンコードされています。
+            StringTokenizer st = new StringTokenizer( responseBody, "&" );
+            Map<String, String> resultMap = new HashMap<String, String>();
+            while( st.hasMoreTokens() )
+            {
+                String paramset = st.nextToken();
+                int idx = paramset.indexOf( "=" );
+                if ( idx > 0 )
+                {
+                    String name = paramset.substring( 0, idx );
+                    String value = paramset.substring( idx + 1 );
+
+                    Logging.info( "[ActionAuChargeResult] name:" + name );
+                    Logging.info( "[ActionAuChargeResult] value:" + value );
+                    resultMap.put( name, URLDecoder.decode( value, "UTF-8" ) );
+                }
+            }
+
+            if ( resultMap != null )
+            {
+                continueAccountId = resultMap.get( "continueAccountId" );
+                memberManageNo = resultMap.get( "memberManageNo" );
+                processDay = resultMap.get( "processDay" );
+                processTime = resultMap.get( "processTime" );
+            }
+
+            if ( continueAccountId != null && processDay != null && processTime != null )
+            {
+
+                registAu = new UserRegistAUSp();
+
+                request.setAttribute( "ORDER_NO", continueAccountId );
+
+                ret = registAu.registPay( request );
+                if ( ret != false )
+                {
+                    requestDispatcher = request.getRequestDispatcher( "au_ok.jsp" );
+                    requestDispatcher.forward( request, response );
+                    return;
+                }
+
+            }
+            requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+            requestDispatcher.forward( request, response );
+            return;
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionAuChargeResult] Exception:" + e.toString() );
+        }
+    }
+
+    /****
+     * ID連携解除処理
+     * 
+     * @param openId
+     * @return
+     */
+    public boolean operateCancelContBill(String tranId)
+    {
+        boolean ret = false;
+        PostMethod post = null;
+        // 継続情報登録
+        String responseBody = "";
+
+        try
+        {
+            // HTTP Client 3.1 を使用することを前提とします。
+            HttpClient client = new HttpClient();
+            client.getParams().setVersion( HttpVersion.HTTP_1_1 );
+            client.getParams().setSoTimeout( 300000 );
+            client.getHttpConnectionManager().getParams().setConnectionTimeout( 300000 );
+            client.getParams().setContentCharset( "UTF-8" );
+
+            // POSTメソッドを用いてアクセスする。
+            post = new PostMethod( "https://connect.auone.jp/sv/py/mpl_rt_api/cca" );
+
+            // リクエストパラメータを設定します。
+            // 原則として、送信パラメータはＵＲＬエンコードする必要があります。
+            post.addParameter( "ID", "OperateCancelContBill" );
+            post.addParameter( "memberId", PROVIDER_CODE );
+            post.addParameter( "serviceId", SERVICE_CODE );
+            post.addParameter( "secureKey", SECURE_KEY );
+            post.addParameter( "OpenIDList", tranId );
+
+            // リクエストヘッダを設定します。
+            post.setRequestHeader( "Accept-Charset", "UTF-8" );
+            post.setRequestHeader( "Content-Type", "application/x-www-form-urlencoded; charset=UTF-8" );
+
+            int status = client.executeMethod( post );
+
+            // レスポンスが正しく返ってきているか確認します。
+            if ( HttpStatus.SC_OK == status )
+            {
+                if ( "MPL01000".equals( post.getResponseHeader( "X-ResultCd" ).getValue() ) != false )
+                {
+                    // 正常終了しているので、リクエストボディ部分を取り出します。
+                    responseBody = post.getResponseBodyAsString();
+                    try
+                    {
+                        String processKbn = "";
+                        String processDay = "";
+                        String processTime = "";
+
+                        // 応答電文を解析し、処理結果を取り出します。
+                        // 応答電文は以下の形式です。値はＵＲＬエンコードされています。
+                        StringTokenizer st = new StringTokenizer( responseBody, "&" );
+                        Map<String, String> resultMap = new HashMap<String, String>();
+                        while( st.hasMoreTokens() )
+                        {
+                            String paramset = st.nextToken();
+                            int idx = paramset.indexOf( "=" );
+                            if ( idx > 0 )
+                            {
+                                String name = paramset.substring( 0, idx );
+                                String value = paramset.substring( idx + 1 );
+                                resultMap.put( name, URLDecoder.decode( value, "UTF-8" ) );
+                            }
+                        }
+
+                        if ( resultMap != null )
+                        {
+                            processKbn = resultMap.get( "processKbn" );
+                            processDay = resultMap.get( "processDay" );
+                            processTime = resultMap.get( "processTime" );
+                        }
+                        if ( processKbn != null && processDay != null && processTime != null )
+                        {
+                            ret = true;
+                        }
+                    }
+                    catch ( Exception e )
+                    {
+
+                    }
+
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            ret = false;
+            Logging.error( "[ActionAUSecession.openIDRls] Exception:" + e.toString() );
+        }
+        finally
+        {
+            if ( post != null )
+            {
+                // 以降、応答電文を使用しないため、コネクションをリリースします。
+                post.releaseConnection();
+            }
+        }
+
+        return ret;
+    }
+}

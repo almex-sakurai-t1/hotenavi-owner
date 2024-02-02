@@ -1,0 +1,137 @@
+<%@ page contentType="text/html; charset=Windows-31J" %>
+<%@ page errorPage="error.jsp" %>
+<%@ page import="java.sql.*" %>
+<%@ page import="com.hotenavi2.common.*" %>
+<jsp:useBean id="ownerinfo" scope="session" class="com.hotenavi2.owner.OwnerInfo" />
+
+<%
+    int          count;
+    boolean      ret;
+    String       query;
+    String       hotelname = "";
+    String       storecount;
+    String       selecthotel;
+    String       param_store;
+    DbAccess     db;
+    ResultSet    result;
+    ResultSet    manage;
+    String amount    = ReplaceString.getParameter(request,"amount");
+    String param_cnt = ReplaceString.getParameter(request,"cnt");
+    if( param_cnt == null )
+    {
+        param_cnt = "0";
+    }
+    if(!CheckString.numCheck(param_cnt))
+	{
+	param_cnt ="0";
+%>
+        <script type="text/javascript">
+        <!--
+        var dd = new Date();
+        setTimeout("window.open('timeoutdisp.html?"+dd.getSeconds()+dd.getMinutes()+dd.getHours()+"','_top')",0000);
+        //-->
+        </script>
+<%
+	}
+    int cnt = Integer.parseInt(param_cnt);
+
+    db =  new DbAccess();
+
+    // 管理可能ホテルの取得
+    query = "SELECT hotel.*,owner_user_hotel.accept_hotelid FROM hotel,owner_user_hotel";
+    query = query + " WHERE hotelid=?";
+    query = query + " AND userid = " + ownerinfo.DbUserId;
+    query = query + " AND owner_user_hotel.accept_hotelid = hotel.hotel_id";
+    manage = db.execQuery(query,(String)session.getAttribute("HotelId") );
+%>
+
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=Windows-31J">
+<meta http-equiv="Pragma" content="no-cache">
+<meta http-equiv="Content-Style-Type" content="text/css">
+<title>店舗選択</title>
+<link href="/common/pc/style/contents.css" rel="stylesheet" type="text/css">
+
+<script type="text/javascript">
+<!--
+function jumpprevfunc() {
+   parent.selectFrame.location.href = "kitchen_info_jump.jsp?cnt=<%= cnt-3 %>&amount=<%= amount %>";
+   parent.dispFrame.location.href = "kitchen_info.jsp?cnt=<%= cnt-3 %>&amount=<%= amount %>";
+   return false;
+}
+
+function jumpnextfunc() {
+   parent.selectFrame.location.href = "kitchen_info_jump.jsp?cnt=<%= cnt+3 %>&amount=<%= amount %>";
+   parent.dispFrame.location.href = "kitchen_info.jsp?cnt=<%= cnt+3 %>&amount=<%= amount %>";
+   return false;
+}
+// -->
+</script>
+
+</head>
+
+<body bgcolor="#D8CA75" text="#663333" leftmargin="0" topmargin="0" marginwidth="0" marginheight="0">
+<table width="100%" height="40" border="0" cellpadding="0" cellspacing="0">
+  <tr>
+<%
+    if( cnt > 0 )
+    {
+%>
+    <td align="left" valign="middle">
+    <a href="#" onclick="return jumpprevfunc()">←前の店舗へ</a>
+    </td>
+<%
+    }
+
+        int store_count = 0;
+
+        // 管理店舗数分ループ
+        ret = manage.first();
+        ret = manage.relative(cnt);
+        while( ret != false )
+        {
+            DbAccess db_name =  new DbAccess();
+
+            // ホテル名称の取得
+            query = "SELECT name FROM hotel WHERE hotel_id='" + manage.getString("accept_hotelid") + "'";
+            result = db_name.execQuery(query);
+            if( result != null )
+            {
+                result.next();
+                hotelname = result.getString("name");
+            }
+
+%>
+    <td align="left" valign="middle">
+    <a href="kitchen_info.jsp?cnt=<%= cnt %>&amount=<%= amount %>#<%= manage.getString("accept_hotelid") %>" target="dispFrame">&gt;&gt;<%= hotelname %></a>
+    </td>
+<%
+            db_name.close();
+
+            ret = manage.next();
+
+            store_count++;
+            if( store_count >= 3 )
+            {
+                break;
+            }
+        }
+
+        if( ret != false )
+        {
+%>
+    <td align="left" valign="middle">
+    <a href="#" onclick="return jumpnextfunc()">→次の店舗へ</a>
+    </td>
+<%
+        }
+%>
+  </tr>
+  </table>
+<%
+    db.close();
+%>
+</body>
+</html>

@@ -1,0 +1,212 @@
+package jp.happyhotel.action;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.net.URLEncoder;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.CheckString;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.common.Url;
+import jp.happyhotel.common.UserAgent;
+import jp.happyhotel.common.XmlParser;
+import jp.happyhotel.data.DataLoginInfo_M2;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpVersion;
+import org.apache.commons.httpclient.methods.GetMethod;
+
+public class ActionYWalletCharge extends BaseAction
+{
+
+    /**
+     *
+     */
+    private static final long   serialVersionUID  = 8361956393383143181L;
+    private static final String TOP_URL           = Url.getUrl() + "/";
+    private static final String TOP_SSL_URL       = Url.getSslUrl() + "/";
+    private RequestDispatcher   requestDispatcher = null;
+    private static String       PID               = "123600006";                                                // 本番用
+    // private static String PID = "123600005"; // テスト用
+    private static String       CHARGE_URL        = "https://ord.wallet.yahooapis.jp/WalletGateway/V1/oa_check";
+    private static String       HOST              = "ord.wallet.yahooapis.jp";
+
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        DataLoginInfo_M2 dataLoginInfo_M2;
+        String deviceURL = "";
+        String queryString = "";
+        String resultStatus = "";
+        String guid = "";
+        String url = "";
+        String accToken = "";
+        String result = "";
+        int nType = 0;
+        int deviceType = 0;
+        try
+        {
+            Logging.info( "[ActionYWalletCharge] " + request.getQueryString() );
+
+            result = request.getParameter( "result" );
+            if ( result == null || result.equals( "" ) != false || CheckString.numCheck( result ) == false )
+            {
+                result = "0";
+            }
+            nType = UserAgent.getUserAgentType( request );
+            if ( nType == UserAgent.USERAGENT_SMARTPHONE )
+            {
+                deviceURL = "phone/";
+            }
+
+            if ( result.equals( "0" ) != false )
+            {
+                // ユーザ情報取得
+                dataLoginInfo_M2 = (DataLoginInfo_M2)request.getAttribute( "LOGIN_INFO" );
+                if ( dataLoginInfo_M2 == null )
+                {
+                    // ログアウト状態の場合はエラー
+                    response.sendRedirect( TOP_URL + deviceURL );
+                    return;
+                }
+                else if ( dataLoginInfo_M2.isPaymemberFlag() == true )
+                {
+
+                    // 有料会員は登録させない
+                    response.sendRedirect( TOP_URL + deviceURL );
+                    return;
+                }
+
+                // Sessionから取得
+                guid = (String)request.getAttribute( "OPENID" );
+                accToken = (String)request.getAttribute( "TOKEN" );
+                if ( guid == null || guid.equals( "" ) != false || accToken == null || accToken.equals( "" ) != false )
+                {
+                    response.sendRedirect( "http://happyhotel.jp/index_yc.jsp" );
+                    return;
+                }
+
+                Logging.info( "[ActionYWalletCharge.act]guid:" + guid );
+                Logging.info( "[ActionYWalletCharge.act]token:" + accToken );
+
+                // リクエストパラメータを設定します。
+                // パラメータ名は大文字、小文字を区別する為、
+                // 正確に設定する必要があります。
+                // 原則として、送信パラメータはＵＲＬエンコードする必要があります。
+                queryString = "?pid=" + PID;
+                queryString += "&guid=" + guid;
+                queryString += "&.done=" + URLEncoder.encode( TOP_SSL_URL + "yWalletCharge.act?result=1", "UTF-8" );
+                queryString += "&.bail=" + URLEncoder.encode( TOP_SSL_URL + "yWalletCharge.act?result=2", "UTF-8" );
+                queryString += "&device=" + deviceType;
+
+                Logging.info( "[ActionYWalletCharge.act] queryString" + queryString );
+
+                // HTTP Client 3.1 を使用することを前提とします。
+                HttpClient client = new HttpClient();
+                client.getParams().setVersion( HttpVersion.HTTP_1_0 );
+                client.getParams().setSoTimeout( 300000 );
+                client.getHttpConnectionManager().getParams().setConnectionTimeout( 300000 );
+                client.getParams().setContentCharset( "UTF-8" );
+
+                // Getメソッドを用いてアクセスする。
+                GetMethod get = new GetMethod( CHARGE_URL + queryString );
+
+                // リクエストヘッダを設定します。
+                //
+                // 以下項目は HTTP-Client により自動的に設定される為、明示的に設定しません。
+                //
+                // ・Host
+                // ・Connection
+                // ・Content-Length
+                //
+                // ※ Content-Type も自動的に設定されますが、「; charset=UTF-8」部分が設定されない為
+                // 明示的に設定を行っています。
+                //
+                // 設定内容の詳細につきましては、Ｉ／Ｆ仕様書に従ってください
+                //
+                get.setRequestHeader( "Accept-Charset", "UTF-8" );
+                get.setRequestHeader( "Content-Type", "application/x-www-form-urlencoded; charset=UTF-8" );
+                get.setRequestHeader( "Authorization", "Bearer " + accToken );
+                get.setRequestHeader( "Host", HOST );
+
+                Logging.info( "[ActionYWalletCharge.act] HOST " + HOST );
+                Logging.info( "[ActionYWalletCharge.act] AUTHORIZATION:" + "Authorization " + "Bearer " + accToken );
+                Logging.info( "[ActionYWalletCharge.act] CHARGE_URL " + CHARGE_URL + queryString );
+
+                // 継続情報登録
+                try
+                {
+                    int status = client.executeMethod( get );
+
+                    Logging.info( "[ActionYWalletCharge.act] status:" + status );
+
+                    // if ( status == HttpStatus.SC_OK )
+                    // {
+
+                    XmlParser parse = null;
+                    // レスポンスをインプットストリームへ
+                    InputStream ins = get.getResponseBodyAsStream();
+
+                    parse = new XmlParser( ins );
+
+                    resultStatus = parse.getElementValue( "Status", "Status" );
+                    if ( resultStatus.equals( "1" ) != false )
+                    {
+                        url = parse.getElementValue( "Status", "Url" );
+                    }
+                    Logging.info( "[ActionYWalletCharge.act] resultStatus:" + resultStatus );
+                    Logging.info( "[ActionYWalletCharge.act] yahooUrl:" + url );
+                    // }
+                    // else
+                    // {
+                    // requestDispatcher = request.getRequestDispatcher( "index_yc.jsp" );
+                    // requestDispatcher.forward( request, response );
+                    // return;
+                    // }
+                }
+                catch ( HttpException e )
+                {
+                    Logging.info( "[ActionYWalletCharge.act] HttpException:" + e.toString() );
+                    response.sendRedirect( TOP_URL + deviceURL + "yw_regist_result.jsp" );
+                    return;
+                }
+                catch ( IOException e )
+                {
+                    Logging.info( "[ActionYWalletCharge.act] IOException:" + e.toString() );
+                    response.sendRedirect( TOP_URL + deviceURL + "yw_regist_result.jsp" );
+                    return;
+                }
+                finally
+                {
+                    // 以降、応答電文を使用しないため、コネクションをリリースします。
+                    get.releaseConnection();
+                }
+
+                if ( url.equals( "" ) == false )
+                {
+                    response.sendRedirect( url );
+                }
+                else
+                {
+                    response.sendRedirect( TOP_URL + deviceURL + "yw_regist_result.jsp" );
+                }
+            }
+            else if ( result.equals( "1" ) != false )
+            {
+                response.sendRedirect( TOP_URL + deviceURL + "yw_regist_result.jsp?result=1" );
+            }
+            else if ( result.equals( "2" ) != false )
+            {
+                response.sendRedirect( TOP_URL + deviceURL + "yw_regist_result.jsp?result=2" );
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionYWalletCharge] Exception:" + e.toString() );
+        }
+    }
+}

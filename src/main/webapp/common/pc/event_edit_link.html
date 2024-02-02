@@ -1,0 +1,58 @@
+<!-- note: this version of the color picker is optimized for IE 5.5+ only -->
+
+<html STYLE="width: 238px; height: 187px"><head><title>リンク先入力</title>
+<link href="../../common/pc/style/contents.css" rel="stylesheet" type="text/css">
+<script language="javascript">
+
+function _CloseOnEsc() {
+  if (event.keyCode == 27) { window.close(); return; }
+}
+
+function Init() {                                                       // run on page load
+  document.body.onkeypress = _CloseOnEsc;
+  document.linkform.URL.value = opener.document.form1.hreflink.value;
+  document.linkform.BLANK.value = opener.document.form1.hrefblank.value;
+  if (opener.document.form1.hrefblank.value == "_self")
+  {
+      document.linkform.BLANK.selectedIndex = 0;
+  }
+  else
+  {
+      document.linkform.BLANK.selectedIndex = 1;
+  }
+}
+
+function Set() {
+  opener.document.form1.hreflink.value = document.linkform.URL.value;
+  opener.document.form1.hrefblank.value = document.linkform.BLANK.options[linkform.BLANK.selectedIndex].value;
+  window.opener.enclose('<a href=\"' + document.linkform.URL.value + '\" target=\"' +  document.linkform.BLANK.options[linkform.BLANK.selectedIndex].value + '\">', '</a>');
+  window.close();
+ }
+
+</script>
+</head>
+<body bgcolor="buttonface" topmargin=0 leftmargin=0 onload="Init();">
+
+<form name="linkform" method=get onSubmit="Set(); return false;">
+
+<table border=0 cellspacing=0 cellpadding=4 width=100% style="margin-top:5px">
+ <tr>
+    <td bgcolor="buttonface" valign=center class=size12>　リンク先URL
+         <input type="text" name="URL" value="" size=45 style="font-size: 12px">
+    </td>
+ </tr>
+ <tr>
+  <td bgcolor="buttonface" class=size12>　リンク先表示方法<br/>
+	<select name="BLANK">
+		<option value="_self">同じウィンドウ
+		<option value="_blank">新しいウィンドウ
+	</select>
+  </td>
+ </tr>
+ <tr>
+  <td bgcolor="buttonface" align="right"><input type="button" onclick="Set();return false;" value="リンク"></td>
+ </tr>
+</table>
+
+</form>
+</body></html>

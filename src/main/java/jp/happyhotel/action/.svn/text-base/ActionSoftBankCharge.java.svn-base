@@ -1,0 +1,485 @@
+package jp.happyhotel.action;
+
+import java.io.ByteArrayInputStream;
+import java.io.FileInputStream;
+import java.io.InputStream;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.math.BigInteger;
+import java.util.List;
+import java.util.Map;
+import java.util.Properties;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.Marshaller;
+import javax.xml.bind.Unmarshaller;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.StringRequestEntity;
+import org.openid4java.consumer.ConsumerManager;
+import org.openid4java.consumer.VerificationResult;
+import org.openid4java.discovery.DiscoveryInformation;
+import org.openid4java.discovery.Identifier;
+import org.openid4java.message.AuthRequest;
+import org.openid4java.message.ParameterList;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.EncodeData;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.common.SessionManager;
+import jp.happyhotel.data.DataLoginInfo_M2;
+import jp.happyhotel.others.SoftBankChargeRequest;
+import jp.happyhotel.others.SoftBankChargeRequest2;
+import jp.happyhotel.others.SoftBankChargeResponse;
+import jp.happyhotel.others.SoftBankChargeResponse2;
+
+public class ActionSoftBankCharge extends BaseAction
+{
+    private RequestDispatcher requestDispatcher = null;
+
+
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        String actionType = "";
+        String openIdUrl = "";
+        List discoveries = null;
+        ConsumerManager manager = null;
+        AuthRequest authReq = null;
+        DiscoveryInformation discovered = null;
+        Cookie[] cks = null;
+        Cookie ck = null;
+        // セッションID
+        String sid = "";
+        // 中間ID
+        String openId = "";
+        String returnURL = "";
+        String queryString = "";
+        String realm = "";
+        VerificationResult verification = null;
+        Identifier verified = null;
+        DataLoginInfo_M2 dataLoginInfo_M2;
+        PostMethod method = null;
+        String tranId = "";
+        String providerCode = "";
+        String serviceCode = "";
+        String actionUrl = "";
+        String relamUrl = "";
+
+        try
+        {
+            Properties prop = new Properties();
+            prop.load( new FileInputStream( "/etc/happyhotel/softbankCharge.conf" ) );
+            actionUrl = prop.getProperty( "actionUrl" );
+            providerCode = prop.getProperty( "providerCode" );
+            serviceCode = prop.getProperty( "serviceCode" );
+            relamUrl = prop.getProperty( "realm" );
+
+            // ユーザ情報取得
+            dataLoginInfo_M2 = (DataLoginInfo_M2)request.getAttribute( "LOGIN_INFO" );
+
+            if ( dataLoginInfo_M2 == null )
+            {
+                // ログアウト状態の場合はエラー
+                requestDispatcher = request.getRequestDispatcher( "mysoftbank_nomember.jsp" );
+                requestDispatcher.forward( request, response );
+                return;
+            }
+            else if(dataLoginInfo_M2.isPaymemberFlag() == true)
+            {
+                // 有料会員は登録させない
+                requestDispatcher = request.getRequestDispatcher( "index.jsp" );
+                requestDispatcher.forward( request, response );
+                return;
+            }
+
+            actionType = request.getParameter("actiontype");
+            if(actionType != null )
+            {
+                if(actionType.equals("MySoftbankCheck") == true)
+                {
+                    // MySoftBank認証
+                    sid = request.getSession().getId();
+                    openIdUrl = "https://id.my.softbank.jp/";
+                    manager = new ConsumerManager();
+                    discoveries = manager.discover(openIdUrl);
+                    // Association処理
+                    if (discoveries != null)
+                    {
+                        discovered = manager.associate(discoveries);
+                        // MySoftBank認証に必要なセッションID追加
+                        ck = new Cookie("sessionId", sid);
+                        ck.setMaxAge(-1);   // 有効期限はブラウザを閉じるまで
+                        ck.setPath("/");
+                        response.addCookie(ck);
+                        // discoveredを保持
+                        SessionManager.addSession(sid, discovered);
+                        // managerは使いまわすので保持
+                        SessionManager.addSession(sid + "manager" , manager);
+                        returnURL = actionUrl + "mypage/softbankCharge.act?actiontype=AuthenticationCheck";
+                        realm = relamUrl;
+                        authReq = manager.authenticate(discovered, returnURL, realm);
+                        // TODO:ソフトバンクからの質問用に作ったクッキーなんで必要なくなったら削除でお願いします。
+                        String test = authReq.getParameterMap().toString();
+                        ck = new Cookie("testparam", test);
+                        ck.setMaxAge(-1);   // 有効期限はブラウザを閉じるまで
+                        ck.setPath("/");
+                        response.addCookie(ck);
+                        request.setAttribute("loginUrl", authReq.getDestinationUrl(true));
+                        requestDispatcher = request.getRequestDispatcher( "mysoftbank_login_sp.jsp" );
+                        requestDispatcher.forward( request, response );
+                    }
+                }
+                else if(actionType.equals("AuthenticationCheck") == true)
+                {
+                    // Authenicationチェック
+                    Map params = request.getParameterMap();
+                    ParameterList openidResp = new ParameterList(params);
+
+                    cks = request.getCookies();
+                    if(cks != null)
+                    {
+                        for (Cookie cookie : cks)
+                        {
+                            if(cookie.getName().equals("sessionId") == true)
+                            {
+                                sid = cookie.getValue();
+                                break;
+                            }
+                        }
+                    }
+
+                    discovered = (DiscoveryInformation)SessionManager.getAttribute(sid);
+                    returnURL = actionUrl + "mypage/softbankCharge.act";
+                    // パラメータ取得
+                    queryString = request.getQueryString();
+                    // URL再作成
+                    if ((queryString != null) && (queryString.length() > 0)) {
+                        returnURL = String.format("%s?%s", returnURL, queryString);
+                    }
+                    manager = (ConsumerManager)SessionManager.getAttribute(sid + "manager");
+                    verification = manager.verify(returnURL, openidResp, discovered);
+
+                    verified = (verification != null) ? verification.getVerifiedId() : null;
+
+                    if(verified != null)
+                    {
+                        openId = parseServiceUserId(verified);
+                        // 中間IDをクッキーに追加
+                        ck = new Cookie("openId", openId);
+                        ck.setMaxAge(-1);   // 有効期限はブラウザを閉じるまで
+                        ck.setPath("/");
+                        response.addCookie(ck);
+                        request.setAttribute("openid", openId);
+                        requestDispatcher = request.getRequestDispatcher( "mysoftbank_charge.jsp" );
+                        requestDispatcher.forward( request, response );
+                    }
+                }
+                else if(actionType.equals("Charge") == true)
+                {
+                    // 課金開始処理
+                    cks = request.getCookies();
+                    if(cks != null)
+                    {
+                        for (Cookie cookie : cks)
+                        {
+                            if(cookie.getName().equals("sessionId") == true)
+                            {
+                                sid = cookie.getValue();
+                                break;
+                            }
+                        }
+                    }
+                    // 中間ID取得
+                    if(cks != null)
+                    {
+                        for (Cookie cookie : cks)
+                        {
+                            if(cookie.getName().equals("openId") == true)
+                            {
+                                openId = cookie.getValue();
+                                break;
+                            }
+                        }
+                    }
+                    SoftBankChargeRequest requestXml = new SoftBankChargeRequest();
+                    requestXml.setProviderCode(providerCode);
+                    requestXml.setServiceCode(serviceCode);
+                    requestXml.setServiceUserId(openId);
+                    // 以下パラメータ、適当に決めてください
+                    requestXml.setServicerManageNo("test");
+                    requestXml.setAmount(new BigInteger("315"));
+                    // ハッピーホテル＿プレミアムコースをbase64変換してます。
+                    requestXml.setCpNote( "pc+lw6XUobyl26XGpeuhsqXXpeyl36WipeCls6G8pbk=" );
+                    requestXml.setOkURL(actionUrl + "mypage/softbankCharge.act?actiontype=ChargeRequest");
+                    requestXml.setNgURL(actionUrl + "mypage/mysoftbank_ng.jsp");
+                    // POSTメソッド作成
+                    method = makeMethod(requestXml, "https://purchase.id.my.softbank.jp/api/" + "BeginningBillingDemand", response);
+                    // 課金開始要求
+                    executeRequest(method);
+                    // レスポンス作成
+                    SoftBankChargeResponse res = makeResponse(method);
+                    // URL遷移
+                    if(res.getRedirectURL() != null && res.getRedirectURL().equals("") != true)
+                    {
+                        request.setAttribute("tranId", res.getTransactionId());
+                        returnURL = "softbankCharge.act?actiontype=ChargeRequest";
+                    }
+                    else
+                    {
+                        returnURL = "mysoftbank_ng.jsp?status=" + res.getResultStatus() + "&statuscode=" + res.getStatusCode();
+                    }
+                    requestDispatcher = request.getRequestDispatcher( returnURL );
+                    requestDispatcher.forward( request, response );
+                }
+                else if(actionType.equals("ChargeRequest") == true)
+                {
+                    cks = request.getCookies();
+                    tranId = (String)request.getAttribute("tranId");
+                    // 中間ID取得
+                    if(cks != null)
+                    {
+                        for (Cookie cookie : cks)
+                        {
+                            if(cookie.getName().equals("openId") == true)
+                            {
+                                openId = cookie.getValue();
+                                break;
+                            }
+                        }
+                    }
+                    // 課金要求処理
+                    SoftBankChargeRequest2 requestXml = new SoftBankChargeRequest2();
+                    requestXml.setProviderCode(providerCode);
+                    requestXml.setServiceCode(serviceCode);
+                    requestXml.setServiceUserId(openId);
+                    requestXml.setTransactionId(tranId);
+                    // POSTメソッド作成
+                    method = makeMethod2(requestXml, "https://purchase.id.my.softbank.jp/api/" + "ExecuteBillingDemand");
+                    // 課金要求
+                    executeRequest(method);
+                    // レスポンス作成
+                    SoftBankChargeResponse2 res = makeResponse2(method);
+                    if(res.getResultStatus().equals("OK") == true)
+                    {
+                        returnURL = "mysoftbank_ok.jsp";
+                        // TODO:DB登録&有料会員ステータス変更
+                    }
+                    else
+                    {
+                        returnURL = "mysoftbank_ng.jsp";
+                    }
+                    requestDispatcher = request.getRequestDispatcher( returnURL );
+                    requestDispatcher.forward( request, response );
+                }
+            }
+
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionSoftBankCharge execute]Exception:" + e.toString() );
+            try
+            {
+                request.setAttribute( "errMsg", e.toString() );
+                requestDispatcher = request.getRequestDispatcher( "mysoftbank_login_sp.jsp" );
+                requestDispatcher.forward( request, response );
+            }
+            catch ( Exception ex )
+            {
+            }
+        }
+        finally
+        {
+        }
+
+    }
+    /**
+     * HTTPリクエスト実行
+     * @param method 実行POSTメソッド
+     *
+     */
+    private SoftBankChargeResponse makeResponse(PostMethod method)
+    {
+        SoftBankChargeResponse ret = null;
+
+        try
+        {
+            ret = new SoftBankChargeResponse();
+
+            // HTTPレスポンスのXMLをアンマーシャルして、レスポンスを作成
+            InputStream input = new ByteArrayInputStream(method.getResponseBodyAsString().getBytes());
+            JAXBContext jaxbContext = JAXBContext.newInstance(SoftBankChargeResponse.class);
+            Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+            ret = (SoftBankChargeResponse) unmarshaller.unmarshal(input);
+        }
+        catch(Exception e)
+        {
+            Logging.error( "[ActionSoftBankCharge makeResponse]Exception:" + e.toString() );
+        }
+        finally
+        {
+
+        }
+
+        return(ret);
+    }
+
+    /**
+     * HTTPリクエスト実行
+     * @param method 実行POSTメソッド
+     *
+     */
+    private SoftBankChargeResponse2 makeResponse2(PostMethod method)
+    {
+        SoftBankChargeResponse2 ret = null;
+
+        try
+        {
+            ret = new SoftBankChargeResponse2();
+
+            // HTTPレスポンスのXMLをアンマーシャルして、レスポンスを作成
+            InputStream input = new ByteArrayInputStream(method.getResponseBodyAsString().getBytes());
+            JAXBContext jaxbContext = JAXBContext.newInstance(SoftBankChargeResponse2.class);
+            Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+            ret = (SoftBankChargeResponse2) unmarshaller.unmarshal(input);
+        }
+        catch(Exception e)
+        {
+            Logging.error( "[ActionSoftBankCharge makeResponse2]Exception:" + e.toString() );
+        }
+        finally
+        {
+
+        }
+
+        return(ret);
+    }
+
+    /**
+     * HTTPリクエスト実行
+     * @param method 実行POSTメソッド
+     *
+     */
+    private void executeRequest(PostMethod method)
+    {
+        int statusCode = 0;
+
+        try
+        {
+            HttpClient client = new HttpClient();
+            statusCode = client.executeMethod(method);
+
+
+        }
+        catch(Exception e)
+        {
+            Logging.error( "[ActionSoftBankCharge executeRequest]Exception:" + e.toString() );
+        }
+        finally
+        {
+        }
+
+        return;
+    }
+
+    /**
+     * POSTメソッド作成処理
+     * @param req リクエストデータ
+     * @param url 接続URL
+     * @return POSTメソッド
+     */
+    private PostMethod makeMethod2(SoftBankChargeRequest2 req, String url)
+    {
+        PostMethod ret = null;
+
+        try
+        {
+            JAXBContext jaxbContext = JAXBContext.newInstance(SoftBankChargeRequest2.class);
+            Marshaller marshaller = jaxbContext.createMarshaller();
+            marshaller.setProperty(Marshaller.JAXB_ENCODING, "UTF-8");
+            marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+            // リクエストをマーシャルして、ボディ用のXMLを作成
+            Writer writer = new StringWriter();
+            marshaller.marshal(req, writer);
+            String body = writer.toString();
+            // ヘッダどボディの設定
+            ret = new PostMethod(url);
+            ret.setRequestHeader("Content-Length", Integer.toString(body.length())); // reqから取得
+            ret.setRequestHeader("Content-Type", "text/xml; charset=UTF-8");
+            ret.setRequestHeader("Connection", "close");
+            ret.setRequestEntity(new StringRequestEntity(body, null, null));
+        }
+        catch(Exception e)
+        {
+            Logging.error( "[ActionSoftBankCharge makeMethod2]Exception:" + e.toString() );
+        }
+        finally
+        {
+
+        }
+
+        return(ret);
+    }
+
+    /**
+     * POSTメソッド作成処理
+     * @param req リクエストデータ
+     * @param url 接続URL
+     * @return POSTメソッド
+     */
+    private PostMethod makeMethod(SoftBankChargeRequest req, String url, HttpServletResponse response)
+    {
+        PostMethod ret = null;
+
+        try
+        {
+            JAXBContext jaxbContext = JAXBContext.newInstance(SoftBankChargeRequest.class);
+            Marshaller marshaller = jaxbContext.createMarshaller();
+            marshaller.setProperty(Marshaller.JAXB_ENCODING, "UTF-8");
+            marshaller.setProperty(Marshaller.JAXB_FORMATTED_OUTPUT, true);
+            // リクエストをマーシャルして、ボディ用のXMLを作成
+            Writer writer = new StringWriter();
+            marshaller.marshal(req, writer);
+            String body = writer.toString();
+            // ヘッダどボディの設定
+            ret = new PostMethod(url);
+            ret.setRequestHeader("Content-Length", Integer.toString(body.length())); // reqから取得
+            ret.setRequestHeader("Content-Type", "text/xml; charset=UTF-8");
+            ret.setRequestHeader("Connection", "close");
+            ret.setRequestEntity(new StringRequestEntity(body, null, null));
+            body = body.replaceAll("\n", "");
+            Cookie ck = new Cookie("testparam", body);
+            ck.setMaxAge(-1);   // 有効期限はブラウザを閉じるまで
+            ck.setPath("/");
+            response.addCookie(ck);
+        }
+        catch(Exception e)
+        {
+            Logging.error( "[ActionSoftBankCharge makeMethod]Exception:" + e.toString() );
+        }
+        finally
+        {
+
+        }
+
+        return(ret);
+    }
+
+    /**
+     * 中間IDを抽出する<br>
+     * (クエリストリングからidに対応する値を取得する)
+     * @param verified 検証結果
+     * @return 中間ID
+     */
+    private String parseServiceUserId(Identifier verified) {
+
+        String tmp = verified.getIdentifier();
+        String result = tmp.replaceAll("^http.*\\?id=", "");
+
+        return result;
+    }
+}

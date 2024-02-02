@@ -1,0 +1,191 @@
+body {
+	scrollbar-face-color: #000000;
+	scrollbar-highlight-color: #4B4B4B;
+	scrollbar-shadow-color: #000000;
+	scrollbar-arrow-color: #4B4B4B;
+	scrollbar-base-color: #4B4B4B;
+	background-color: #000000;
+	margin: 0 7 0 7;
+	background-image: url(image/bg.jpg); 
+/*	background-repeat: repeat-y;*/
+	background-position: left bottom;
+}
+
+a {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: none;
+	color: #0000ff;
+}
+a:link {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: none;
+	color: #ffffff;
+
+}
+a:visited {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: none;
+	color: #ffffff;
+}
+a:hover {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: underline;
+	color: #ffffff;
+
+}
+a:active {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	text-decoration: none;
+	color: #ffffff;
+
+}
+
+
+/* ƒƒjƒ…[ƒ{ƒbƒNƒX */
+.menu_gif{
+height:20px;
+}
+
+.menubar_basecolor{
+	background-color: #CDCCCC;
+	border: none;
+	height: 18px;
+	width: 156px;
+}
+.menubar_linecolor{
+	background-color: #4B4B4B;
+	border: none;
+	height: 18px;
+}
+
+.menubox{
+	width:156;
+	background-color: #000000;
+	border-width: 1 0 0 1;
+	border-style: solid;
+	border-color: #ffffff;
+	padding: 2px 2px 2px 3px;
+	margin: 0px;
+}
+
+table.menubox td{
+	width:156;
+	border-width: 0 1 1px 0;
+	border-style: solid;
+	border-color: #ffffff;
+}
+	
+	
+/* ƒzƒeƒ‹ƒgƒbƒv */
+.hoteltop {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	color: #CDCCCC;
+	padding-top: 2px;
+	padding-right: 2px;
+	padding-bottom: 2px;
+	padding-left: 4px;
+	text-decoration: none;
+}
+
+a.hoteltop{
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	color: #000000;
+	padding-top: 2px;
+	padding-right: 2px;
+	padding-bottom: 2px;
+	padding-left: 4px;
+	text-decoration: none;
+}
+a.hoteltop:link{
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	color: #000000;
+	padding-top: 2px;
+	padding-right: 2px;
+	padding-bottom: 2px;
+	padding-left: 4px;
+	text-decoration: none;
+}
+
+a.hoteltop:visited{
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	color: #000000;
+	padding-top: 2px;
+	padding-right: 2px;
+	padding-bottom: 2px;
+	padding-left: 4px;
+	text-decoration: none;
+}
+a.hoteltop:hover{
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	color: #000000;
+	padding-top: 2px;
+	padding-right: 2px;
+	padding-bottom: 2px;
+	padding-left: 4px;
+	text-decoration: underline;
+}
+a.hoteltop:active{
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	color: #000000;
+	padding-top: 2px;
+	padding-right: 2px;
+	padding-bottom: 2px;
+	padding-left: 4px;
+	text-decoration: none;
+}
+
+
+/* ‚æ‚¤‚±‚» */
+.name {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 10px;
+	color: #ffffff;
+	padding-top: 2px;
+	padding-right: 2px;
+	padding-bottom: 6px;
+	padding-left: 8px;
+
+}
+.powered {
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka", "sans-serif";
+	font-size: 10px;
+	letter-spacing: 1px;
+	padding-bottom: 4px;
+
+}
+/* ƒOƒ‹[ƒvƒgƒbƒvAƒIƒtƒBƒVƒƒƒ‹ƒTƒCƒgƒŠƒ“ƒN */
+.grouptop{
+	font-family: "‚l‚r ‚oƒSƒVƒbƒN", "Osaka";
+	font-size: 12px;
+	line-height: 140%;
+	color:#411F00;
+	background-color: #CDCCCC;
+	padding-top: 2px;
+	padding-right: 2px;
+	padding-bottom: 2px;
+	padding-left: 4px;
+	text-decoration: none;
+	width:156;
+}

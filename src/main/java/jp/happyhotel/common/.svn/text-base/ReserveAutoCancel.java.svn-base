@@ -1,0 +1,1543 @@
+package jp.happyhotel.common;
+
+import java.io.FileInputStream;
+import java.sql.Connection;
+import java.sql.DriverManager;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+import java.sql.SQLException;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.HashMap;
+import java.util.Properties;
+
+import jp.happyhotel.data.DataRsvCreditSales;
+import jp.happyhotel.data.DataRsvMailRequest;
+import jp.happyhotel.data.DataRsvReserve;
+import jp.happyhotel.data.DataRsvReserveHistory;
+import jp.happyhotel.data.DataRsvResult;
+import jp.happyhotel.data.DataRsvRoomRemainder;
+import jp.happyhotel.data.DataRsvSpid;
+import JP.co.ccsjens.ccsware.client.CwRpc;
+
+/**
+ * 予約自動キャンセル及びnoshowクレジット処理
+ * 
+ * @author Y.Tanabe
+ * @version 2.00 2012/03/16
+ */
+public class ReserveAutoCancel
+{
+
+    private static final int  TYPE_AUTO_CANCEL   = 1;                                              // 自動キャンセル&NoShowクレジット対象
+    private static final int  TYPE_NOSHOW_CREDIT = 2;                                              // NoShowクレジット対象
+    private static final int  NO_SHOW_ON         = 1;
+
+    private static Properties prop               = null;
+    private static String     driver             = "";
+    private static String     connurl            = "";
+    private static String     user               = "";
+    private static String     password           = "";
+    private static String     jdbcds             = null;
+    private static String     adminAddress       = null;
+    private static String     reserveAddress     = null;
+
+    // GMOクレジット設定ファイル
+    private final String      PROPFILE           = Constants.configFilesPath + "gmoccscredit.conf";
+    // 簡易オーソリーJOBコード
+    private final String      JOB_SAUTH          = "SAUTH";
+    // 売上処理JOBコード
+    private final String      JOB_CAPTURE        = "CAPTURE";
+    // 売上取消処理JOBコード
+    private final String      JOB_RETURN         = "RETURN";
+    // カード番号桁数
+    private final int         CARDNO_MAXLENGTH   = 16;
+    // 決済正常時エラーコード
+    private final String      SETTLEMENT_OK      = "   ";
+    // リモートプロシージャコール
+    private CwRpc             rpc;
+    // SPID
+    private String            spid;
+    // クレジットカード番号
+    private String            cardNo;
+    // 有効期限(YYMM)
+    private String            cardExpire;
+    // 支払金額
+    private int               amount;
+    // トランザクションID
+    private String            tranId;
+    // 承認番号
+    private String            approveNo;
+    // 仕向先コード
+    private String            forwardCode;
+    // エラーコード
+    private String            errorCode;
+    // 詳細エラーコード
+    private String            errorInfo;
+    // エラーレベル
+    private int               errorLevel;
+    // 取消トランザクションID
+    private String            cancelTranId;
+
+    static
+    {
+        try
+        {
+
+            prop = new Properties();
+            // ﾌﾟﾛﾊﾟﾃｨﾌｧｲﾙからｷｰと値のﾘｽﾄを読み込みます
+            prop.load( new FileInputStream( "/etc/happyhotel/dbconnect.conf" ) );
+            // "jdbc.driver"に設定されている値を取得します
+            driver = prop.getProperty( "jdbc.driver" );
+            // "jdbc.url"に設定されている値を取得します
+            connurl = prop.getProperty( "jdbc.url" );
+            // "jdbc.user"に設定されている値を取得します
+            user = prop.getProperty( "jdbc.user" );
+            // "jdbc.url"に設定されている値を取得します
+            password = prop.getProperty( "jdbc.password" );
+            // "jdbc.datasource"に設定されている値を取得します
+            jdbcds = prop.getProperty( "jdbc.datasource" );
+
+            // 事務局のメールアドレスと送り元メールアドレスの取得
+            prop.load( new FileInputStream( "/etc/happyhotel/reserveMail.conf" ) );
+
+            adminAddress = prop.getProperty( "admin.address" );
+            reserveAddress = prop.getProperty( "reserve.address" );
+
+        }
+        catch ( Exception e )
+        {
+            System.out.println( e.toString() );
+        }
+    }
+
+    /**
+     * メイン
+     * 
+     * @param argv(引数1はyyyymmddで指定した日の予約キャンセルを行うことができる)
+     *            引数2はcancelなら自動キャンセルのみcreditならノーショークレジットのみ行う
+     * 
+     */
+    public static void main(String argv[])
+    {
+        Debug( "START" );
+        String query = "";
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+        int autoCancelTime = 0;
+        int startTargetyyyymmdd = 0;
+        String targetyyyymmdd = "";
+        String hotelMailText = "";
+        String hotelMailTitle = "";
+        String imediaMailText = "";
+        String imediaMailTitle = "";
+        int nowHotelId = 0;
+        String selectHotelId = "";
+        ArrayList<String> reserveNoList = new ArrayList<String>();
+        ArrayList<Integer> hotelidList = new ArrayList<Integer>();
+        ArrayList<String> hotelcancelList = new ArrayList<String>();
+        HashMap<String, String> reserveDatetimeHash = new HashMap<String, String>();
+        HashMap<String, Integer> typeHash = new HashMap<String, Integer>();
+
+        boolean cancelflag = true;
+        boolean creditflag = true;
+
+        try
+        {
+            if ( argv.length > 0 )
+            {
+                // 指定日の取得
+                targetyyyymmdd = argv[0];
+            }
+
+            if ( targetyyyymmdd.equals( "" ) )
+            {
+                // 指定日をプログラムの前日に指定
+                targetyyyymmdd = String.valueOf( DateEdit.addDay( Integer.parseInt( DateEdit.getDate( 2 ) ), -1 ) );
+            }
+
+            if ( argv.length > 1 )
+            {
+                // キャンセルのみかクレジットのみか判定
+                if ( argv[1].equals( "cancel" ) )
+                {
+                    creditflag = false;
+                }
+                else if ( argv[1].equals( "credit" ) )
+                {
+                    cancelflag = false;
+                }
+            }
+
+            if ( argv.length > 2 )
+            {
+                // 指定ホテルID
+                selectHotelId = argv[2];
+            }
+
+            startTargetyyyymmdd = DateEdit.addDay( Integer.parseInt( targetyyyymmdd ), -1 );
+
+            autoCancelTime = getAutoCancelStartTime();
+
+            // 初期文言セット
+            hotelMailText = createHotelFirstMessage( startTargetyyyymmdd, Integer.parseInt( targetyyyymmdd ), autoCancelTime, "までの以下の来店未確認の予約のキャンセルを行いました。\r\n" );
+            if ( cancelflag == true && creditflag == true )
+            {
+                imediaMailTitle = "予約自動キャンセル・NoShowクレジット結果";
+            }
+            else if ( cancelflag == true && creditflag == false )
+            {
+                imediaMailTitle = "予約自動キャンセル結果";
+            }
+            else if ( cancelflag == false && creditflag == true )
+            {
+                imediaMailTitle = "NoShowクレジット結果";
+            }
+            Debug( "imediaMailTitle:" + imediaMailTitle );
+
+            // MySQLへ接続する
+            connection = getConnection();
+
+            // 対象の予約データ取得
+            query = "SELECT id, reserve_no,reserve_date,est_time_arrival,status FROM hh_rsv_reserve WHERE ((reserve_date = ? AND est_time_arrival >= ?) OR (reserve_date > ?)) AND ( (reserve_date < ?) OR (reserve_date = ? AND est_time_arrival < ?) ) AND" +
+                    " ((status = ?) OR (status = ? AND noshow_flag = 1 AND tranid = '') )";
+            if ( selectHotelId.equals( "" ) == false )
+            {
+                query += " AND id = ? ";
+            }
+            query += " order by id,reserve_no, reserve_date, est_time_arrival ";
+            prestate = connection.prepareStatement( query );
+            prestate.setInt( 1, startTargetyyyymmdd );
+            prestate.setInt( 2, autoCancelTime );
+            prestate.setInt( 3, startTargetyyyymmdd );
+            prestate.setInt( 4, Integer.parseInt( targetyyyymmdd ) );
+            prestate.setInt( 5, Integer.parseInt( targetyyyymmdd ) );
+            prestate.setInt( 6, autoCancelTime );
+            prestate.setInt( 7, ReserveCommon.RSV_STATUS_UKETUKE );
+            prestate.setInt( 8, ReserveCommon.RSV_STATUS_CANCEL );
+            if ( selectHotelId.equals( "" ) == false )
+            {
+                prestate.setString( 9, selectHotelId );
+            }
+            result = prestate.executeQuery();
+            if ( result != null )
+            {
+                while( result.next() != false )
+                {
+                    Debug( "reserve_no:" + result.getString( "reserve_no" ) );
+                    reserveNoList.add( result.getString( "reserve_no" ) );
+                    hotelidList.add( result.getInt( "id" ) );
+                    reserveDatetimeHash.put( result.getString( "reserve_no" ), String.format( "%1$04d年%2$02d月%3$02d日 %4$02d時%5$02d分", result.getInt( "reserve_date" ) / 10000, result.getInt( "reserve_date" ) % 10000 / 100,
+                            result.getInt( "reserve_date" ) % 10000 % 100, result.getInt( "est_time_arrival" ) / 10000, result.getInt( "est_time_arrival" ) % 10000 / 100 ) );
+                    if ( result.getInt( "status" ) == ReserveCommon.RSV_STATUS_CANCEL )
+                    {
+                        // noshowキャンセル
+                        typeHash.put( result.getString( "reserve_no" ), TYPE_NOSHOW_CREDIT );
+                    }
+                    else
+                    {
+                        // 自動キャンセル対象来店待ち
+                        typeHash.put( result.getString( "reserve_no" ), TYPE_AUTO_CANCEL );
+                    }
+                }
+            }
+            Debug( "startTargetyyyymmdd:" + startTargetyyyymmdd + ", autoCancelTime:" + autoCancelTime + ", targetyyyymmdd:" + targetyyyymmdd
+                    + ", ReserveCommon.RSV_STATUS_UKETUKE:" + ReserveCommon.RSV_STATUS_UKETUKE + ", ReserveCommon.RSV_STATUS_CANCEL:" + ReserveCommon.RSV_STATUS_CANCEL );
+
+            if ( reserveNoList.size() > 0 )
+            {
+                Debug( "reserveNoList=" + reserveNoList.size() );
+                // 予約番号リストから対象の自動キャンセルを行う
+                for( int i = 0 ; i < reserveNoList.size() ; i++ )
+                {
+                    // ホテルIDが変わったら一度ホテル宛へメールする(自動キャンセル)
+                    if ( nowHotelId > 0 && nowHotelId != hotelidList.get( i ) && cancelflag == true )
+                    {
+                        Debug( "予約自動キャンセルのお知らせ" );
+                        // タイトル作成
+                        hotelMailTitle = "予約自動キャンセルのお知らせ";
+                        // メール送信用にテーブルに追加
+                        addHotelMailList( nowHotelId, reserveAddress, hotelMailTitle, hotelMailText );
+                        // メールテキストリセット
+                        hotelMailText = createHotelFirstMessage( startTargetyyyymmdd, Integer.parseInt( targetyyyymmdd ), autoCancelTime, "までの以下の来店未確認の予約のキャンセルを行いました。\r\n" );
+                    }
+                    // ホテルIDが変わったタイミングでnoshowクレジットを行う
+                    if ( nowHotelId > 0 && nowHotelId != hotelidList.get( i ) && creditflag == true )
+                    {
+
+                        // NoShow対応ホテルのnoshowクレジット処理
+                        if ( checkNoShowCreditHotel( hotelidList.get( i ) ) == true )
+                        {
+                            if ( noshowCreditHotel( nowHotelId, targetyyyymmdd, hotelcancelList, startTargetyyyymmdd, autoCancelTime, reserveDatetimeHash ) == true )
+                            {
+                                // 事務局への結果メール
+                                imediaMailText += "ホテルID：" + nowHotelId + "NoShowクレジット処理完了 ○\r\n";
+                            }
+                            else
+                            {
+                                // 事務局への結果メール
+                                imediaMailText += "ホテルID：" + nowHotelId + "NoShowクレジット処理未完了 ×\r\n";
+                            }
+                            Debug( "imediaMailText:" + imediaMailText );
+
+                        }
+                        hotelcancelList.clear();
+                    }
+                    nowHotelId = hotelidList.get( i );
+                    if ( cancelflag == true && typeHash.get( reserveNoList.get( i ) ) == TYPE_AUTO_CANCEL )
+                    {
+                        // 自動キャンセル処理
+                        if ( executeAutoCancel( hotelidList.get( i ), reserveNoList.get( i ) ) )
+                        {
+                            // ホテルのメールと事務局のメール追加
+                            hotelMailText += "自動キャンセル予約番号：" + reserveNoList.get( i ).substring( reserveNoList.get( i ).length() - 4 ) + "\r\n";
+                            // 事務局
+                            imediaMailText += "ホテルID：" + hotelidList.get( i ) + " 自動キャンセル予約番号：" + reserveNoList.get( i ).substring( reserveNoList.get( i ).length() - 4 ) + " ○\r\n";
+                            hotelcancelList.add( reserveNoList.get( i ) );
+                        }
+                        else
+                        {
+                            // 失敗時は事務局のメール追加
+                            imediaMailText += "ホテルID：" + hotelidList.get( i ) + " 自動キャンセル予約番号：" + reserveNoList.get( i ).substring( reserveNoList.get( i ).length() - 4 ) + " ×\r\n";
+                        }
+                        Debug( "imediaMailText:" + imediaMailText );
+                    }
+                }
+                // 最後のホテルのメールを出す
+                if ( cancelflag == true )
+                {
+                    Debug( "予約自動キャンセルのお知らせ" );
+                    // タイトル作成
+                    hotelMailTitle = "予約自動キャンセルのお知らせ";
+                    // メール送信用にテーブルに追加
+                    addHotelMailList( nowHotelId, reserveAddress, hotelMailTitle, hotelMailText );
+                }
+                if ( creditflag == true )
+                {
+                    // 対象ホテルのnoshowクレジット処理
+                    if ( noshowCreditHotel( nowHotelId, targetyyyymmdd, hotelcancelList, startTargetyyyymmdd, autoCancelTime, reserveDatetimeHash ) == true )
+                    {
+                        // 事務局への結果メール
+                        imediaMailText += "ホテルID：" + nowHotelId + "NoShowクレジット処理完了\r\n";
+                    }
+                    else
+                    {
+                        // 事務局への結果メール
+                        imediaMailText += "ホテルID：" + nowHotelId + "NoShowクレジット処理未完了\r\n";
+                    }
+                }
+                Debug( "imediaMailText:" + imediaMailText );
+                // 全体の結果を事務局へメール出す
+                // SendMail.send( reserveAddress, adminAddress, imediaMailTitle, imediaMailText );
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ReserveAutoCancel.main] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+            Debug( "END" );
+        }
+        return;
+    }
+
+    /**
+     * 対象ホテルノーショー請求処理
+     * 
+     * @param reserveNo 予約番号
+     * 
+     * @return 成否(true→成功,false→失敗)
+     */
+    private static boolean noshowCreditHotel(int id, String targetyyyymmdd, ArrayList<String> hotelcancelList, int startTargetyyyymmdd, int autoCancelTime, HashMap<String, String> reserveDatetimeHash)
+    {
+        boolean ret = false;
+        String query = "";
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+        ArrayList<String> reserveNoList = new ArrayList<String>();
+        String mailTitle = "";
+        String imediaMailTitle = "";
+        String mailText = "";
+        // 事務局アドレス
+        String adminAddress = "";
+        // 送り元アドレス
+        String reserveAddress = "";
+
+        try
+        {
+            mailTitle = "NoShowクレジット結果";
+            imediaMailTitle = "NoShowクレジットのお知らせ";
+
+            // MySQLへ接続する
+            connection = getConnection();
+
+            query = "SELECT id, reserve_no FROM hh_rsv_reserve WHERE ((reserve_date = ? AND est_time_arrival >= ?) OR (reserve_date > ?)) AND ( (reserve_date < ?) OR (reserve_date = ? AND est_time_arrival < ?) ) AND" +
+                    " id = ? AND tranid = '' AND status = ? AND noshow_flag = 1 order by reserve_date, reserve_no";
+            prestate = connection.prepareStatement( query );
+            prestate.setInt( 1, startTargetyyyymmdd );
+            prestate.setInt( 2, autoCancelTime );
+            prestate.setInt( 3, startTargetyyyymmdd );
+            prestate.setInt( 4, Integer.parseInt( targetyyyymmdd ) );
+            prestate.setInt( 5, Integer.parseInt( targetyyyymmdd ) );
+            prestate.setInt( 6, autoCancelTime );
+            prestate.setInt( 7, id );
+            prestate.setInt( 8, ReserveCommon.RSV_STATUS_CANCEL );
+            result = prestate.executeQuery();
+
+            if ( result != null )
+            {
+                while( result.next() != false )
+                {
+                    reserveNoList.add( result.getString( "reserve_no" ) );
+                }
+            }
+
+            Debug( "reserveNoList=" + reserveNoList.size() );
+
+            if ( reserveNoList.size() > 0 )
+            {
+                mailText = createHotelFirstMessage( startTargetyyyymmdd, Integer.parseInt( targetyyyymmdd ), autoCancelTime, "までの以下の予約キャンセルに対してNoShowチャージを行いました。\r\n" );
+
+                for( int i = 0 ; i < reserveNoList.size() ; i++ )
+                {
+                    // 対象予約番号のnoshowクレジット処理
+                    if ( executeNoshowSales( reserveNoList.get( i ) ) == true )
+                    {
+                        mailText += "予約番号：" + reserveNoList.get( i ).substring( reserveNoList.get( i ).length() - 4 ) + "到着予定日時：" + reserveDatetimeHash.get( reserveNoList.get( i ) ) + " ○";
+                    }
+                    else
+                    {
+                        mailText += "予約番号：" + reserveNoList.get( i ).substring( reserveNoList.get( i ).length() - 4 ) + "到着予定日時：" + reserveDatetimeHash.get( reserveNoList.get( i ) ) + " ×";
+                    }
+                    for( int j = 0 ; j < hotelcancelList.size() ; j++ )
+                    {
+                        if ( reserveNoList.get( i ).equals( hotelcancelList.get( i ) ) )
+                        {
+                            mailText += " (自動キャンセル)";
+                            break;
+                        }
+                    }
+                    mailText += "\r\n";
+                }
+                Debug( "mailText=" + mailText );
+
+                // ホテル宛にメール送信
+                // addHotelMailList( id, reserveAddress, mailTitle, mailText );
+                // アイメディアにメール送信
+                // SendMail.send( reserveAddress, adminAddress, imediaMailTitle, mailText );
+            }
+            // 最後まで行けば結果をTrue
+            ret = true;
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ReserveAutoCancel.noshowCreditHotel] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+        }
+        return(ret);
+    }
+
+    /**
+     * ノーショー請求処理
+     * 
+     * @param reserveNo 予約番号
+     * 
+     * @return 成否(true→成功,false→失敗)
+     */
+    private static boolean executeNoshowSales(String reserveNo)
+    {
+        String query = "";
+        GMOCcsCredit gmoccs = new GMOCcsCredit();
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+        String cardno = "";
+        int limitdate = 0;
+        int hotelid = 0;
+        int checkhotelid = 0;
+        int amount = 0;
+        String frontIp = "";
+        boolean ret = false;
+        String mailText = "";
+        String mailTitle = "";
+        String adminAddress = "";
+        String reserveAddress = "";
+        String senddata;
+        String header = "";
+        // デフォルト15秒
+        int timeout = 15000;
+        int retrycount = 0;
+        int portno = 0;
+        String recvdata = "";
+        char cdata[];
+        String data = "";
+
+        DataRsvCreditSales dataSales = null;
+        DataRsvSpid dataSpid = null;
+        DataRsvReserve dataReserve = null;
+
+        try
+        {
+
+            // ホスト送信タイムアウト時間
+            prop.load( new FileInputStream( "/etc/happyhotel/gmoccscredit.conf" ) );
+            if ( CheckString.numCheck( prop.getProperty( "creditdata.hosttimeout" ) ) )
+            {
+                timeout = Integer.parseInt( prop.getProperty( "creditdata.hosttimeout" ) );
+            }
+            if ( CheckString.numCheck( prop.getProperty( "creditdata.retrycount" ) ) )
+            {
+                retrycount = Integer.parseInt( prop.getProperty( "creditdata.retrycount" ) );
+            }
+            if ( CheckString.numCheck( prop.getProperty( "creditdata.hostportno" ) ) )
+            {
+                portno = Integer.parseInt( prop.getProperty( "creditdata.hostportno" ) );
+            }
+
+            // MySQLへ接続する
+            connection = getConnection();
+
+            while( true )
+            {
+                // 予約番号から対象のクレジットデータ取得
+                query = "select card_no, limit_date, id from hh_rsv_credit where reserve_no = ? AND del_flag = 0";
+                prestate = connection.prepareStatement( query );
+                prestate.setString( 1, reserveNo );
+                result = prestate.executeQuery();
+                if ( result != null && result.next() != false )
+                {
+                    // カード番号複合化
+                    Debug( "仮card=" + result.getString( "card_no" ) );
+                    cardno = DecodeData.decodeString( "axpol ptmhyeeahl".getBytes( "8859_1" ), "s h t t i s n h ".getBytes( "8859_1" ), new String( result.getString( "card_no" ) ) );
+                    // 有効期限
+                    limitdate = result.getInt( "limit_date" );
+                    // ホテルID
+                    hotelid = result.getInt( "id" );
+                }
+                // クレジットデータのホテルIDから対象のSPID取得
+                if ( hotelid <= 0 )
+                {
+                    Logging.error( "[ReserveAutoCancel.executeNoshowSales] hh_rsv_credit noData reserveNo=" + reserveNo );
+                    break;
+                }
+                // ホテルIDからSPID情報取得
+                dataSpid = new DataRsvSpid();
+                if ( dataSpid.getDataByHotelid( connection, hotelid ) == false )
+                {
+                    Logging.error( "[ReserveAutoCancel.executeNoshowSales] hh_rsv_spid noData hotelid=" + hotelid );
+                    break;
+                }
+
+                // ホテルのIPアドレス取得
+                result.close();
+                query = "SELECT hh_hotel_basic.id, hh_hotel_master.front_ip, hh_hotel_basic.noshow_hotelid FROM hh_hotel_basic, hh_hotel_master WHERE hh_hotel_basic.id = ? AND hh_hotel_basic.id = hh_hotel_master.id";
+                prestate = connection.prepareStatement( query );
+                prestate.setInt( 1, hotelid );
+                result = prestate.executeQuery();
+                if ( result != null && result.next() != false )
+                {
+                    if ( result.getInt( "noshow_hotelid" ) > 0 )
+                    {
+                        int noshowid = result.getInt( "noshow_hotelid" );
+                        result.close();
+                        // 対象のidでfront_ip再取得
+                        query = "SELECT hh_hotel_basic.id,hotel.front_ip FROM hh_hotel_basic,hotel WHERE hh_hotel_basic.id = ? AND hh_hotel_basic.hotenavi_id = hotel.hotel_id";
+                        prestate = connection.prepareStatement( query );
+                        prestate.setInt( 1, noshowid );
+                        result = prestate.executeQuery();
+                        if ( result != null && result.next() != false )
+                        {
+                            frontIp = result.getString( "front_ip" );
+                        }
+                        checkhotelid = noshowid;
+                    }
+                    else
+                    {
+                        frontIp = result.getString( "front_ip" );
+                        checkhotelid = hotelid;
+                    }
+                }
+                if ( frontIp.equals( "" ) )
+                {
+                    Logging.error( "[ReserveAutoCancel.executeNoshowSales] hotel.front_ip noData hotelid=" + hotelid );
+                    break;
+                }
+
+                Debug( "checkhotelid:" + checkhotelid );
+                Debug( "dataSpid.getSpid():" + dataSpid.getSpid() );
+                Debug( "frontIp:" + frontIp );
+
+                // SPIDの現場データとの一致の確認
+                if ( gmoccs.checkSPID( checkhotelid, dataSpid.getSpid(), frontIp ) == false )
+                {
+                    // 事務局へメール
+                    mailTitle = "NoShowクレジットSPID間違い";
+                    mailText = "SPIDが間違っています。\r\n";
+                    mailText = "------DBデータ------\r\n";
+                    mailText += "ホテルID：" + checkhotelid + "\r\n";
+                    mailText += "SPID：" + dataSpid.getSpid() + "\r\n";
+                    mailText += "frontIp：" + frontIp + "\r\n";
+                    // SendMail.send( reserveAddress, adminAddress, mailTitle, mailText );
+                    break;
+                }
+
+                // ノーショー課金
+                // 請求額取得
+                amount = getAmount( reserveNo );
+                if ( amount <= 0 )
+                {
+                    Logging.error( "[ReserveAutoCancel.executeNoshowSales] noAmountValue reserveNo=" + reserveNo + "amount=" + amount );
+                    break;
+                }
+                gmoccs.setCardNo( cardno );
+                gmoccs.setCardExpire( String.format( "%1$04d", limitdate ) );
+                gmoccs.setSpid( dataSpid.getSpid() );
+                gmoccs.setAmount( amount );
+                if ( gmoccs.execSales() == false )
+                {
+                    break;
+                }
+                // 売上データの作成
+                dataSales = new DataRsvCreditSales();
+                dataSales.setReserve_no( reserveNo );
+                dataSales.setSpid( dataSpid.getSpid() );
+                dataSales.setSales_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                dataSales.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                dataSales.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                dataSales.setSales_name( dataSpid.getSales_name() );
+                dataSales.setReserve_amount( amount );
+                dataSales.setAmount( amount );
+                dataSales.setPercent( 100 );
+                dataSales.setApprove( Integer.valueOf( gmoccs.getApproveNo() ) );
+                dataSales.setForward( gmoccs.getForwardCode() );
+                dataSales.setTranid( gmoccs.getTranId() );
+                dataSales.setCancel_tranid( "" );
+                dataSales.setCancel_flag( 0 );
+                dataSales.setId( hotelid );
+                dataSales.insertData( connection );
+                dataSales.setSelectSeqNo( connection );
+                // ホストから送信するためのログ吐き出し
+
+                // 予約データにトランザクションIDを更新
+                dataReserve = new DataRsvReserve();
+                if ( dataReserve.getData( connection, hotelid, reserveNo ) == false )
+                {
+                    Logging.error( "[ReserveAutoCancel.executeNoshowSales] noDataRsvReserve hotelid=" + hotelid + "reserveNo=" + reserveNo );
+                    break;
+                }
+                dataReserve.setTranid( gmoccs.getTranId() );
+                dataReserve.setCancelTranid( "" );
+                if ( dataReserve.updateData( connection, hotelid, reserveNo ) == false )
+                {
+                    Logging.error( "[ReserveAutoCancel.executeNoshowSales] DataRsvReserve UPDATA NG hotelid=" + hotelid + "reserveNo=" + reserveNo + "tranid=" + gmoccs.getTranId() );
+                    break;
+                }
+                ret = true;
+                break;
+            }
+
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ReserveAutoCancel.executeNoshowSales] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+        }
+        return(ret);
+    }
+
+    /**
+     * 
+     * 予約請求額取得
+     * 
+     * @param yyyyymmdd 取得対象予約日
+     * 
+     * @return 予約番号リスト
+     */
+    private static int getAmount(String reserveNo)
+    {
+        int ret = 0;
+        String query = "";
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+        String driver = "";
+        String connurl = "";
+        String user = "";
+        String password = "";
+
+        try
+        {
+            // MySQLへ接続する
+            connection = getConnection();
+
+            query = "SELECT charge_total FROM hh_rsv_reserve WHERE reserve_no = ?";
+            prestate = connection.prepareStatement( query );
+            prestate.setString( 1, reserveNo );
+            result = prestate.executeQuery();
+            if ( result != null )
+            {
+                while( result.next() != false )
+                {
+                    ret = result.getInt( "charge_total" );
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ReserveAutoCancel.getAmount] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * ホテルメールリスト追加処理
+     * 
+     * @param id ホテルID
+     * @param from 送り元メールアドレス
+     * @param title タイトル
+     * @param body 本文
+     * 
+     */
+    private static void addHotelMailList(int id, String from, String title, String body)
+    {
+        String query = "";
+        Connection connection = null;
+        PreparedStatement prestate = null;
+        ResultSet result = null;
+        Connection connection2 = null;
+        PreparedStatement prestate2 = null;
+        ResultSet result2 = null;
+        // ホテルメールアドレス(PC)
+        String hotelAddressPc = "";
+        // ホテルメールアドレス(携帯)
+        String hotelAddressMobile = "";
+        // メール送信スタート時間
+        int mailStartTime = 0;
+        // メール送信終了時間
+        int mailEndTime = 0;
+
+        try
+        {
+
+            // MySQLへ接続する
+            connection = getConnection();
+
+            // ホテルのホテナビIDとグループIDを取得
+            query = "select hotel.group_id, hotel.hotel_id from hotel ";
+            query += " inner join hh_hotel_basic on hotel.hotel_id = hh_hotel_basic.hotenavi_id ";
+            query += " where hh_hotel_basic.id = ?";
+            prestate = connection.prepareStatement( query );
+            prestate.setInt( 1, id );
+            result = prestate.executeQuery();
+
+            if ( result.next() != false )
+            {
+                connection2 = getConnection();
+                query = " SELECT DISTINCT u.mailaddr_pc,u.mailaddr_mobile,u.mail_starttime,u.mail_endtime" +
+                        " ,s.sec_level21,s.sec_level22" +
+                        " FROM owner_user u,owner_user_security s,owner_user_hotel h" +
+                        " WHERE u.hotelid = ?" +
+                        " AND h.accept_hotelid = ?" +
+                        " AND h.hotelid = u.hotelid" +
+                        " AND h.userid = u.userid" +
+                        " AND s.hotelid = u.hotelid" +
+                        " AND s.userid = u.userid " +
+                        " AND (s.sec_level21 = 1 OR s.sec_level22 = 1)";
+                prestate2 = connection2.prepareStatement( query );
+                prestate2.setString( 1, result.getString( "group_id" ) );
+                prestate2.setString( 2, result.getString( "hotel_id" ) );
+                result2 = prestate2.executeQuery();
+
+                Debug( "group_id:" + result.getString( "group_id" ) );
+                Debug( "hotel_id:" + result.getString( "hotel_id" ) );
+
+                while( result2.next() != false )
+                {
+                    if ( result2.getInt( "sec_level21" ) == 1 && result2.getString( "mailaddr_pc" ).length() > 0 )
+                    {
+                        // 重複したアドレスに送らないようにする
+                        hotelAddressPc = result2.getString( "mailaddr_pc" );
+                        mailStartTime = result2.getInt( "mail_starttime" );
+                        mailEndTime = result2.getInt( "mail_endtime" );
+                        insertHotelMailList( id, from, title, body, hotelAddressPc, mailStartTime, mailEndTime );
+                    }
+                    if ( result2.getInt( "sec_level22" ) == 1 && result2.getString( "mailaddr_mobile" ).length() > 0 )
+                    {
+                        hotelAddressMobile = result2.getString( "mailaddr_mobile" );
+                        mailStartTime = result2.getInt( "mail_starttime" );
+                        mailEndTime = result2.getInt( "mail_endtime" );
+                        insertHotelMailList( id, from, title, body, hotelAddressMobile, mailStartTime, mailEndTime );
+                    }
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ReserveAutoCancel.addHotelMailList] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+            DBConnection.releaseResources( result2, prestate2, connection2 );
+        }
+        return;
+    }
+
+    /**
+     * ホテルメールリストDB追加処理
+     * 
+     * @param id ホテルID
+     * @param from 送り元メールアドレス
+     * @param title タイトル
+     * @param body 本文
+     * @param to 送り先メールアドレス
+     * @param starttime メール送信開始時間
+     * @param endtime メール送信終了時間
+     * 
+     */
+    private static void insertHotelMailList(int id, String from, String title, String body, String to, int starttime, int endtime)
+    {
+        String query = "";
+        Connection connection = null;
+        PreparedStatement prestate = null;
+        String driver = "";
+        String connurl = "";
+        String user = "";
+        String password = "";
+
+        try
+        {
+            // MySQLへ接続する
+            connection = getConnection();
+
+            query = "INSERT hh_rsv_reserve_hotel_maillist SET id = ?, to_address = ?, from_address = ?, title = ?, body = ?, send_status = ?, regist_date = ?, regist_time = ?, ";
+            query += "sendmail_starttime = ?, sendmail_endtime = ?, send_flag = ?, send_date = ?, send_time = ?, memo = ?";
+
+            prestate = connection.prepareStatement( query );
+            prestate.setInt( 1, id );
+            prestate.setString( 2, to );
+            prestate.setString( 3, from );
+            prestate.setString( 4, title );
+            prestate.setString( 5, body );
+            prestate.setInt( 6, 0 );
+            prestate.setString( 7, DateEdit.getDate( 2 ) );
+            prestate.setString( 8, DateEdit.getTime( 1 ) );
+            prestate.setInt( 9, starttime );
+            prestate.setInt( 10, endtime );
+            prestate.setInt( 11, 0 );
+            prestate.setInt( 12, 0 );
+            prestate.setInt( 13, 0 );
+            prestate.setString( 14, "" );
+
+            prestate.executeUpdate();
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ReserveAutoCancel.insertHotelMailList] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( prestate );
+            DBConnection.releaseResources( connection );
+        }
+        return;
+    }
+
+    /**
+     * ホテルメッセージ用タイトル作成処理
+     * 
+     * @param startTargetyyyymmdd 開始年月日
+     * @param targetyyyymmdd 終了年月日
+     * @param autoCancelTime 自動キャンセル時刻
+     * @param plusStr 追加メッセージ
+     * 
+     * @return 自動キャンセルの成否(true→キャンセル成功,false→キャンセル失敗)
+     * 
+     */
+    private static String createHotelFirstMessage(int startTargetyyyymmdd, int targetyyyymmdd, int autoCancelTime, String plusStr)
+    {
+        String ret = "";
+
+        ret = String.format( "%1$04d年%2$02d月%3$02d日 %4$02d時%5$02d分", startTargetyyyymmdd / 10000, startTargetyyyymmdd % 10000 / 100, startTargetyyyymmdd % 10000 % 100, autoCancelTime / 100, autoCancelTime % 100 ) + "から";
+        ret += String.format( "%1$04d年%2$02d月%3$02d日 %4$02d時%5$02d分", targetyyyymmdd / 10000, targetyyyymmdd % 10000 / 100, targetyyyymmdd % 10000 % 100, autoCancelTime / 100, autoCancelTime % 100 );
+        ret += plusStr;
+
+        return(ret);
+    }
+
+    /**
+     * 予約自動キャンセル処理
+     * 
+     * @param reserveNo 予約番号
+     * @param hotelid ホテルID
+     * 
+     * @return 自動キャンセルの成否(true→キャンセル成功,false→キャンセル失敗)
+     * 
+     */
+    private static boolean executeAutoCancel(int hotelid, String reserveNo)
+    {
+        String query = "";
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+        boolean blnRet = true;
+        String driver = "";
+        String connurl = "";
+        String user = "";
+        String password = "";
+        DataRsvReserve dataReserve = null;
+        boolean ret = false;
+
+        try
+        {
+            // 予約データ取得
+            dataReserve = getReserveData( hotelid, reserveNo );
+            while( true )
+            {
+                if ( dataReserve == null || dataReserve.getReserveNo().equals( "" ) || dataReserve.getID() <= 0 )
+                {
+                    Logging.error( "[ReserveAutoCancel.executeAutoCancel] noDataRsvReserve hotelid=" + hotelid + "reserveNo=" + reserveNo );
+                    break;
+                }
+                // ノーショーホテルか判定
+                if ( checkNoShowCreditHotel( hotelid ) == true )
+                {
+                    dataReserve.setNowShowFlag( NO_SHOW_ON );
+                }
+                else
+                {
+                    dataReserve.setNowShowFlag( 0 );
+                }
+
+                // MySQLへ接続する
+                connection = getConnection();
+
+                query = "START TRANSACTION ";
+                // トランザクション開始
+                prestate = connection.prepareStatement( query );
+                result = prestate.executeQuery();
+                // 予約番号枝番更新
+                dataReserve.setReserveSubNo( dataReserve.getReserveNoSub() + 1 );
+                // 予約データのキャンセル更新
+                blnRet = setReserveStatusCancel( connection, prestate, dataReserve );
+                if ( blnRet != true )
+                {
+                    Logging.error( "[ReserveAutoCancel.executeAutoCancel] setReserveStatusCancel NG reserveNo=" + reserveNo );
+                    break;
+                }
+                if ( dataReserve.getNowShowFlag() == NO_SHOW_ON )
+                {
+                    // 実績データを作成
+                    blnRet = registRsvResultCancel( connection, dataReserve );
+                    if ( blnRet != true )
+                    {
+                        Logging.error( "[ReserveAutoCancel.executeAutoCancel] registRsvResultCancel NG reserveNo=" + reserveNo );
+                        break;
+                    }
+                }
+                // 部屋残数更新
+                blnRet = createRoomRemaindar( connection, dataReserve );
+                if ( blnRet != true )
+                {
+                    Logging.error( "[ReserveAutoCancel.executeAutoCancel] createRoomRemaindar NG reserveNo=" + reserveNo );
+                    break;
+                }
+                // 予約履歴データ作成
+                blnRet = createRsvHistory( connection, dataReserve );
+                if ( blnRet != true )
+                {
+                    Logging.error( "[ReserveAutoCancel.executeAutoCancel] createRsvHistory NG reserveNo=" + reserveNo );
+                    break;
+                }
+                // 予約・オプション履歴データ作成
+                blnRet = createRsvOptionHistory( connection, prestate, dataReserve );
+                if ( blnRet != true )
+                {
+                    Logging.error( "[ReserveAutoCancel.executeAutoCancel] createRsvOptionHistory NG reserveNo=" + reserveNo );
+                    break;
+                }
+                // メール送信依頼データ作成
+                // sendMail( connection, dataReserve );
+                // 予約ユーザー基本データ更新
+                blnRet = updateRsvUserBasic( connection, prestate, dataReserve );
+                if ( blnRet != true )
+                {
+                    Logging.error( "[ReserveAutoCancel.executeAutoCancel] updateRsvUserBasic NG reserveNo=" + reserveNo );
+                    break;
+                }
+                break;
+            }
+            // 結果によってｺﾐｯﾄorﾛｰﾙﾊﾞｯｸ
+            if ( blnRet )
+            {
+                query = "COMMIT ";
+                prestate = connection.prepareStatement( query );
+                result = prestate.executeQuery();
+                ret = true;
+            }
+            else
+            {
+                query = "ROLLBACK";
+                prestate = connection.prepareStatement( query );
+                result = prestate.executeQuery();
+            }
+        }
+        catch ( Exception e )
+        {
+            query = "ROLLBACK";
+            try
+            {
+                prestate = connection.prepareStatement( query );
+                result = prestate.executeQuery();
+            }
+            catch ( SQLException e1 )
+            {
+                Logging.error( "[ReserveAutoCancel.executeAutoCancel] Exception=" + e.toString() );
+            }
+            Logging.error( "[ReserveAutoCancel.executeAutoCancel] Exception=" + e.toString() );
+
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * 予約ユーザー基本データ更新
+     * 
+     * @param connection Connectionオブジェクト
+     * @param prestate PreparedStatementオブジェクト
+     * @param drr 予約データ
+     * @return true:処理成功、false:処理失敗
+     */
+    private static boolean updateRsvUserBasic(Connection connection, PreparedStatement prestate, DataRsvReserve drr) throws Exception
+    {
+
+        boolean ret = false;
+        String query = "";
+        int retCnt = 0;
+        int idx = 1;
+        int rsvLimitEndDate = 0;
+        int range = 0;
+        Calendar calendar = Calendar.getInstance();
+        Properties config = new Properties();
+        FileInputStream propfile = null;
+
+        query = query + "UPDATE hh_rsv_user_basic SET ";
+
+        query = query + "cancel_count = cancel_count + 1, ";
+        // No-Showの場合
+        if ( drr.getPayment() != 1 )// 事前決済ならペナルティをつけない
+        {
+            query = query + "noshow_count = noshow_count + 1, ";
+            query = query + "limitation_flag = 1, ";
+            query = query + "limitation_start_date = ?, ";
+            query = query + "limitation_end_date = ?, ";
+            query = query + "limitation_reserve_no = ?, ";
+            idx = 4;
+        }
+
+        // 予約機能制限終了日の取得
+        calendar.set( Integer.parseInt( Integer.toString( drr.getReserveDate() ).substring( 0, 4 ) ),
+                Integer.parseInt( Integer.toString( drr.getReserveDate() ).substring( 4, 6 ) ) - 1,
+                Integer.parseInt( Integer.toString( drr.getReserveDate() ).substring( 6, 8 ) ) );
+
+        // プランイメージファイル格納先取得
+        propfile = new FileInputStream( ReserveCommon.RSV_LIMIT_CONF );
+        config = new Properties();
+        config.load( propfile );
+
+        range = Integer.parseInt( config.getProperty( ReserveCommon.LIMIT_KEY ) );
+        propfile.close();
+        calendar.add( Calendar.DATE, range );
+
+        rsvLimitEndDate = Integer.parseInt( calendar.get( Calendar.YEAR ) +
+                String.format( "%1$02d", calendar.get( Calendar.MONTH ) + 1 ) +
+                String.format( "%1$02d", calendar.get( Calendar.DATE ) ) );
+        query = query + "last_reserve_date = ?, ";
+        query = query + "last_update = ?, ";
+        query = query + "last_uptime = ? ";
+        query = query + " WHERE user_id = ? ";
+
+        try
+        {
+            prestate = connection.prepareStatement( query );
+            if ( idx == 4 )
+            {
+                prestate.setInt( 1, drr.getReserveDate() );
+                prestate.setInt( 2, rsvLimitEndDate );
+                prestate.setString( 3, drr.getReserveNo() );
+            }
+
+            prestate.setInt( idx, drr.getReserveDate() );
+            prestate.setInt( idx + 1, Integer.parseInt( DateEdit.getDate( 2 ) ) );
+            prestate.setInt( idx + 2, Integer.parseInt( DateEdit.getTime( 1 ) ) );
+            prestate.setString( idx + 3, drr.getUserId() );
+            // if ( frm.getNoShow() == ReserveCommon.NO_SHOW_ON )
+            {
+                // No-showキャンセルの場合
+            }
+            retCnt = prestate.executeUpdate();
+
+            if ( retCnt > 0 )
+            {
+                ret = true;
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ReserveAutoCancel.updateRsvUserBasic] Exception=" + e.toString() );
+            throw e;
+        }
+
+        return(ret);
+    }
+
+    /**
+     * メール送信依頼データ作成
+     * 
+     * @param connection Connection
+     * @param drr 予約データ
+     * @return なし
+     */
+    private static void sendMail(Connection connection, DataRsvReserve drr)
+    {
+        DataRsvMailRequest data = new DataRsvMailRequest();
+
+        data.setId( drr.getID() );
+        data.setReserveNo( drr.getReserveNo() );
+        data.setReserveSubNo( drr.getReserveNoSub() );
+        if ( drr.getNowShowFlag() == ReserveCommon.NO_SHOW_ON )
+        {
+            data.setRequestMailKind( ReserveCommon.MAIL_REQ_NOSHOW );
+        }
+        else
+        {
+            data.setRequestMailKind( ReserveCommon.MAIL_REQ_CANCELRSV );
+        }
+        data.setRequestFlag( 0 );
+        data.setRegistTermKind( ReserveCommon.TERM_KIND_PC );
+        data.setRegistDate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+        data.setRegistTime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+
+        data.insertData( connection );
+
+        // ホテル向けに作成
+        data.setRequestMailKind( ReserveCommon.MAIL_REQ_HOTEL_NOSHOW ); // 依頼メール区分
+        data.insertData( connection );
+
+        // リマインダが"ON"の場合、さらに１件追加する
+        if ( drr.getReminderFlag() == 1 )
+        {
+            data.setRequestMailKind( ReserveCommon.MAIL_REQ_REMINDAR ); // 依頼メール区分
+            data.insertData( connection );
+        }
+    }
+
+    /**
+     * 予約・オプション履歴データ作成
+     * 
+     * @param connection Connectionオブジェクト
+     * @param prestate PreparedStatementオブジェクト
+     * @param drr 予約データ
+     * @return true:処理成功、false:処理失敗
+     */
+    private static boolean createRsvOptionHistory(Connection connection, PreparedStatement prestate, DataRsvReserve drr) throws Exception
+    {
+
+        boolean ret = true;
+        String query = "";
+
+        query = query + "INSERT INTO hh_rsv_rel_reserve_option_history ( ";
+        query = query + "  id ";
+        query = query + " ,reserve_no ";
+        query = query + " ,reserve_sub_no ";
+        query = query + " ,option_id ";
+        query = query + " ,option_sub_id ";
+        query = query + " ,quantity ";
+        query = query + " ,unit_price ";
+        query = query + " ,charge_total ";
+        query = query + " ,remarks ";
+        query = query + ") ";
+        query = query + "SELECT  ";
+        query = query + "  id ";
+        query = query + " ,reserve_no ";
+        query = query + " ,? ";
+        query = query + " ,option_id ";
+        query = query + " ,option_sub_id ";
+        query = query + " ,quantity ";
+        query = query + " ,unit_price ";
+        query = query + " ,charge_total ";
+        query = query + " ,remarks ";
+        query = query + "FROM hh_rsv_rel_reserve_option ";
+        query = query + "WHERE id = ? ";
+        query = query + "  AND reserve_no = ? ";
+
+        try
+        {
+            prestate = connection.prepareStatement( query );
+            prestate.setInt( 1, drr.getReserveNoSub() );
+            prestate.setInt( 2, drr.getID() );
+            prestate.setString( 3, drr.getReserveNo() );
+            prestate.executeUpdate();
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ReserveAutoCancel.createRsvOptionHistory] Exception=" + e.toString() );
+            ret = false;
+            throw e;
+        }
+
+        return(ret);
+    }
+
+    /**
+     * 予約履歴データ作成
+     * 
+     * @param connection Connectionオブジェクト
+     * @param drr 予約データ
+     * @return true:処理成功、false:処理失敗
+     */
+    private static boolean createRsvHistory(Connection connection, DataRsvReserve drr)
+    {
+
+        boolean ret = false;
+        DataRsvReserveHistory drrh = new DataRsvReserveHistory();
+
+        // 予約履歴データ
+        drrh = new DataRsvReserveHistory();
+        drrh.setId( drr.getID() );
+        drrh.setReserveNo( drr.getReserveNo() );
+        drrh.setReserveSubNo( drr.getReserveNoSub() );
+        drrh.setUpdateKind( ReserveCommon.UPDKBN_CANCEL );
+        drrh.setPlanId( drr.getPlanId() );
+        drrh.steUserId( drr.getUserId() );
+        drrh.setReserveDate( drr.getReserveDate() );
+        drrh.setSeq( drr.getSeq() );
+        drrh.setEstTimeArrival( drr.getEstTimeArrival() );
+        drrh.setNumAdult( drr.getNumAdult() );
+        drrh.setNumChild( drr.getNumChild() );
+        drrh.setNameLast( drr.getNameLast() );
+        drrh.setNameFirst( drr.getNameFirst() );
+        drrh.setNameLastKana( drr.getNameLastKana() );
+        drrh.setNameFirstKana( drr.getNameFirstKana() );
+        drrh.setZipCd( drr.getZipCd() );
+        drrh.setPrefCode( drr.getPrefCode() );
+        drrh.setJisCode( drr.getJisCode() );
+        drrh.setAddress1( drr.getAddress1() );
+        drrh.setAddress2( drr.getAddress2() );
+        drrh.setAddress3( drr.getAddress3() );
+        drrh.setTel1( drr.getTel1() );
+        drrh.setTel2( drr.getTel2() );
+        drrh.setRemaindFlag( drr.getReminderFlag() );
+        drrh.setMailAddr( drr.getMailAddr() );
+        drrh.setDemands( drr.getDemands() );
+        drrh.setRemarks( drr.getRemarks() );
+        drrh.setAcceptDate( drr.getAcceptDate() );
+        drrh.setAcceptTime( drr.getAcceptTime() );
+        drrh.setStatus( drr.getStatus() );
+        drrh.setBasicChargeTotal( drr.getBasicChargeTotal() );
+        drrh.setOptionChargeTotal( drr.getOptionChargeTotal() );
+        drrh.setChargeTotal( drr.getChargeTotal() );
+        drrh.setAddPoint( drr.getAddPoint() );
+        drrh.setComingFlag( drr.getComingFlag() );
+        drrh.setHotelName( drr.getHotelName() );
+        drrh.setNowShowFlag( drr.getNowShowFlag() );
+        drrh.setParking( drr.getParking() );
+        drrh.setParkingCount( drr.getParkingCount() );
+        drrh.setHiRoofCount( drr.getParkingHiRoofCount() );
+        drrh.setCiTimeFrom( drr.getCiTimeFrom() );
+        drrh.setCiTimeTo( drr.getCiTimeTo() );
+        drrh.setCoTime( drr.getCoTime() );
+        drrh.setTempComingFlag( drr.getTempComingFlag() );
+        drrh.setNumMan( drr.getNumMan() );
+        drrh.setNumWoman( drr.getNumWoman() );
+
+        ret = drrh.insertData( connection );
+
+        return(ret);
+    }
+
+    /**
+     * 部屋残数データ作成
+     * 
+     * @param connection Connectionオブジェクト
+     * @param DataRsvReserve 予約データ
+     * @return true:処理成功、false:処理失敗
+     */
+    private static boolean createRoomRemaindar(Connection connection, DataRsvReserve drr)
+    {
+        boolean ret = false;
+        DataRsvRoomRemainder data = new DataRsvRoomRemainder();
+
+        data.setStatus( ReserveCommon.ROOM_STATUS_EMPTY );
+        data.setReserveNo( drr.getReserveNo() );
+
+        /* ret = data.updateData( connection, drr.getID(), drr.getReserveDate(), drr.getSeq(), ReserveCommon.SCHEMA_OLDRSV ); */
+
+        return(ret);
+    }
+
+    /**
+     * 
+     * 予約データの取得
+     * 
+     * @param hotelid ホテルID
+     * @param reserveNo 予約番号
+     * @throws Exception
+     */
+    private static DataRsvReserve getReserveData(int hotelid, String reserveNo)
+    {
+        DataRsvReserve ret = new DataRsvReserve();
+        Connection connection = null;
+
+        try
+        {
+            connection = getConnection();
+            // データの取得
+            ret.getData( connection, hotelid, reserveNo );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ReserveAutoCancel.getReserveData] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( connection );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * 
+     * 予約データの更新
+     * 
+     * @param connection Connection
+     * @param drr 予約データ
+     * @throws Exception
+     */
+    private static boolean registRsvResultCancel(Connection connection, DataRsvReserve drr)
+    {
+
+        boolean ret = false;
+        DataRsvResult drrs = new DataRsvResult();
+
+        drrs.setId( drr.getID() );
+        drrs.setRsvNo( drr.getReserveNo() );
+        drrs.setSeq( drr.getSeq() );
+        drrs.setCiDate( drr.getReserveDate() );
+        drrs.setUseKind( ReserveCommon.RESULT_KIND_NOSHOW );
+        drrs.setTotalFlag( 0 );
+        drrs.setTotalDate( 0 );
+        drrs.setTotalTime( 0 );
+        drrs.setRegistDate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+        drrs.setRegistTime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+
+        ret = drrs.insertData( connection );
+
+        return(ret);
+    }
+
+    /**
+     * 予約データキャンセル更新
+     * 
+     * @param conn Connectionオブジェクト
+     * @param prestate PreparedStatementオブジェクト
+     * @param drr 予約データ
+     * @return true:正常、false:異常
+     */
+    private static boolean setReserveStatusCancel(Connection conn, PreparedStatement prestate, DataRsvReserve drr)
+    {
+        String query = "";
+        int retCnt = 0;
+        boolean ret = false;
+
+        query = query + "UPDATE hh_rsv_reserve SET ";
+        query = query + "  reserve_sub_no = ? ";
+        query = query + " ,status = ? ";
+        query = query + " ,accept_date = ? ";
+        query = query + " ,accept_time = ? ";
+        query = query + " ,noshow_flag = ? ";
+        query = query + " WHERE reserve_no = ? ";
+
+        try
+        {
+            prestate = conn.prepareStatement( query );
+            prestate.setInt( 1, drr.getReserveNoSub() );
+            prestate.setInt( 2, ReserveCommon.RSV_STATUS_CANCEL );
+            prestate.setInt( 3, Integer.parseInt( DateEdit.getDate( 2 ) ) );
+            prestate.setInt( 4, Integer.parseInt( DateEdit.getTime( 1 ) ) );
+            prestate.setInt( 5, drr.getNowShowFlag() );
+            prestate.setString( 6, drr.getReserveNo() );
+
+            retCnt = prestate.executeUpdate();
+
+            if ( retCnt > 0 )
+            {
+                ret = true;
+            }
+
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ReserveAutoCancel.setReserveStatusCancel] Exception=" + e.toString() );
+        }
+        return(ret);
+    }
+
+    /***
+     * 自動キャンセル時刻取得処理
+     * 
+     * @return 自動キャンセル時刻
+     **/
+    private static int getAutoCancelStartTime()
+    {
+        int startTime = 0;
+        String ret = "";
+        String query = "";
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+
+        query = "SELECT val1 FROM hh_rsv_system_conf WHERE ctrl_id1 = ? and ctrl_id2 = 1";
+
+        try
+        {
+            // MySQLへ接続する
+            connection = getConnection();
+
+            prestate = connection.prepareStatement( query );
+            prestate.setInt( 1, ReserveCommon.RESERVE_SYSTEMCONF_CHAGE_START_TIME );
+            result = prestate.executeQuery();
+            if ( result != null && result.next() == true )
+            {
+                ret = result.getString( "val1" );
+            }
+            // 数値変換できるかどうか
+            if ( (ret != null) && (ret.equals( "" ) == false) && (CheckString.numCheck( ret ) != false) )
+            {
+                startTime = Integer.parseInt( ret );
+            }
+
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ReserveAutoCancel.getAutoCancelStartTime()] Exception=" + e.toString() );
+            startTime = 0;
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+        }
+
+        return(startTime);
+    }
+
+    /***
+     * ノーショークレジット有効ホテル判定処理
+     * 
+     * @param hotelid ホテルID
+     * @return 判定結果(true→有効,false→無効)
+     **/
+    public static boolean checkNoShowCreditHotel(int hotelid)
+    {
+        boolean ret = false;
+
+        String query = "";
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+
+        query = "select noshow_credit_flag from hh_rsv_reserve_basic where id = ?";
+
+        try
+        {
+            connection = getConnection();
+            prestate = connection.prepareStatement( query );
+            prestate.setInt( 1, hotelid );
+            result = prestate.executeQuery();
+            if ( result != null && result.next() == true )
+            {
+                if ( result.getInt( "noshow_credit_flag" ) == 1 )
+                {
+                    ret = true;
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ReserveAutoCancel.checkNoShowCreditHotel] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * コネクション取得
+     * 
+     * @return
+     * @throws Exception
+     */
+    public static Connection getConnection() throws Exception
+    {
+
+        Connection conn = null;
+        try
+        {
+
+            Class.forName( driver );
+            // DBへ接続する
+            conn = DriverManager.getConnection( connurl, user, password );
+
+            if ( conn == null )
+            {
+                Debug( " DBConnection - getConnection() ---> Connection:null" );
+            }
+            else
+            {
+                conn.setReadOnly( false );
+                conn.setAutoCommit( true );
+            }
+        }
+        catch ( Exception ex )
+        {
+            Debug( " DBConnection - getConnection() ---> connection failed : " + ex.toString() );
+            throw ex;
+        }
+        return conn;
+    }
+
+    /**
+     * ログ出力処理
+     * 
+     * @param output
+     */
+    private static void Debug(String output)
+    {
+        System.out.println( output );
+    }
+
+}

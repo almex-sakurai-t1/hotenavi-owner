@@ -1,0 +1,240 @@
+package jp.happyhotel.action;
+
+import java.io.IOException;
+import java.net.URLDecoder;
+import java.net.URLEncoder;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.StringTokenizer;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.DateEdit;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.common.SelectCookie;
+import jp.happyhotel.data.DataUserSp;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.HttpVersion;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+/**
+ * 
+ * 継続課金情報登録用サーブレット
+ * 
+ * 継続情報登録が正常に完了した場合、このサーブレットが呼び出されるとします。
+ * オーソリ＆売上確定要求用電文の送受信には『Jakarta Commons HttpClient3.1』を使用。
+ */
+public class ActionAUCharge extends BaseAction
+{
+
+    /**
+     *
+     */
+    private static final long   serialVersionUID    = 8361956393383143181L;
+    private static final String PROVIDER_CODE       = "67812";
+    private static final String SERVICE_CODE        = "10003";
+    private static final String SECURE_KEY          = "r1l9AB5u1MOi0Pe9dfsGjUi9RtDiFgmJ";
+    private static final String PRICE               = "324";
+    private static final String PRICE2              = "330";
+    private static final String TOP_URL             = "https://ssl.happyhotel.jp/phone/";
+    private static final String MYPAGE              = "mypage/au/";
+    private static final String MANAGE_ORDER_NO     = "300000";
+    private static final int    FIRST_AMOUNT_CHANGE = 20191001;
+    private static final int    NEXT_AMOUNT_CHANGE  = 20190901;
+
+    private RequestDispatcher   requestDispatcher   = null;
+
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        String openId = "";
+        String manageNo = "";
+        String tranId = "";
+        String message = "";
+        DataUserSp dus;
+        int today = 0;
+        try
+        {
+            today = Integer.parseInt( DateEdit.getDate( 2 ) );
+            dus = new DataUserSp();
+            openId = SelectCookie.getCookieValue( request, "hhauhappy" );
+            Logging.info( "[ActionAuCharge] openId:" + openId );
+
+            // HTTP Client 3.1 を使用することを前提とします。
+            HttpClient client = new HttpClient();
+            client.getParams().setVersion( HttpVersion.HTTP_1_1 );
+            client.getParams().setSoTimeout( 300000 );
+            client.getHttpConnectionManager().getParams().setConnectionTimeout( 300000 );
+            client.getParams().setContentCharset( "UTF-8" );
+
+            // POSTメソッドを用いてアクセスする。
+            PostMethod post = new PostMethod( "https://connect.auone.jp/net/py/mpl_rt_net/cca" );
+
+            manageNo = MANAGE_ORDER_NO + DateEdit.getDate( 2 ) + String.format( "%06d", Integer.parseInt( DateEdit.getTime( 1 ) ) );
+            message = "毎月１日課金";
+
+            // リクエストパラメータを設定します。
+            // パラメータ名は大文字、小文字を区別する為、
+            // 正確に設定する必要があります。
+            // 原則として、送信パラメータはＵＲＬエンコードする必要があります。
+            post.addParameter( "ID", "PayCertForContBill" );
+            post.addParameter( "memberId", PROVIDER_CODE );
+            post.addParameter( "serviceId", SERVICE_CODE );
+            post.addParameter( "secureKey", SECURE_KEY );
+            post.addParameter( "certType", "01" );
+            post.addParameter( "openId", openId );
+            post.addParameter( "accountIntervalKbn", "02" );
+            post.addParameter( "accountInterval", "1" );
+            post.addParameter( "accountTimingKbn", "01" );
+            post.addParameter( "accountTiming", "1" );
+            post.addParameter( "firstAccountDay", DateEdit.getDate( 2 ) );
+
+            // 2019年10月1日であれば、330円をセット
+            if ( today >= FIRST_AMOUNT_CHANGE )
+            {
+                post.addParameter( "firstAmount", PRICE2 );
+            }
+            else
+            {
+                post.addParameter( "firstAmount", PRICE );
+            }
+
+            // 2019年9月1日以降であれば、330円をセット
+            if ( today >= NEXT_AMOUNT_CHANGE )
+            {
+                post.addParameter( "nextAmount", PRICE2 );
+            }
+            else
+            {
+                post.addParameter( "nextAmount", PRICE );
+            }
+            post.addParameter( "commodity", message );
+            post.addParameter( "memberAuthOkUrl", TOP_URL + MYPAGE + "auChargeResult.act" );
+            post.addParameter( "memberAuthNgUrl", TOP_URL + MYPAGE + "error.jsp" );
+            post.addParameter( "memberManageNo", manageNo );
+            post.addParameter( "serviceName", "" );
+            post.addParameter( "serviceTel", "" );
+            post.addParameter( "contentId", "" );
+
+            // リクエストヘッダを設定します。
+            //
+            // 以下項目は HTTP-Client により自動的に設定される為、明示的に設定しません。
+            //
+            // ・Host
+            // ・Connection
+            // ・Content-Length
+            //
+            // ※ Content-Type も自動的に設定されますが、「; charset=UTF-8」部分が設定されない為
+            // 明示的に設定を行っています。
+            //
+            // 設定内容の詳細につきましては、Ｉ／Ｆ仕様書に従ってください
+            //
+            post.setRequestHeader( "Accept-Charset", "UTF-8" );
+            post.setRequestHeader( "Content-Type", "application/x-www-form-urlencoded; charset=UTF-8" );
+
+            // 継続情報登録
+            String responseBody = "";
+            try
+            {
+                int status = client.executeMethod( post );
+                Logging.info( "[ActionAuCharge] status:" + status );
+                Logging.info( "[ActionAuCharge] X-ResultCd:" + post.getResponseHeader( "X-ResultCd" ).getValue() );
+
+                // レスポンスが正しく返ってきているか確認します。
+
+                if ( HttpStatus.SC_OK != status )
+                {
+                    // (b) 継続情報登録エラー処理
+                    requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                    requestDispatcher.forward( request, response );
+                    return;
+                }
+
+                // 決済認可要求の処理結果を確認します。
+                if ( "MPL30000".equals( post.getResponseHeader( "X-ResultCd" ).getValue() ) != false )
+                {
+                    response.sendRedirect( "auAuthnService.act?loginop=p_reg" );
+                    return;
+                }
+
+                // 決済認可要求の処理結果を確認します。
+                if ( "MPL01000".equals( post.getResponseHeader( "X-ResultCd" ).getValue() ) == false )
+                {
+                    // (b) 継続情報登録エラー処理
+                    requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                    requestDispatcher.forward( request, response );
+                    return;
+                }
+
+                // 正常終了しているので、リクエストボディ部分を取り出します。
+                responseBody = post.getResponseBodyAsString();
+
+            }
+            catch ( HttpException e )
+            {
+                requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                requestDispatcher.forward( request, response );
+                return;
+            }
+            catch ( IOException e )
+            {
+                requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                requestDispatcher.forward( request, response );
+                return;
+            }
+            finally
+            {
+                // 以降、応答電文を使用しないため、コネクションをリリースします。
+                post.releaseConnection();
+            }
+
+            // 応答電文を解析し、処理結果を取り出します。
+            // 応答電文は以下の形式です。値はＵＲＬエンコードされています。
+            StringTokenizer st = new StringTokenizer( responseBody, "&" );
+            Map<String, String> resultMap = new HashMap<String, String>();
+            while( st.hasMoreTokens() )
+            {
+                String paramset = st.nextToken();
+                int idx = paramset.indexOf( "=" );
+                if ( idx > 0 )
+                {
+                    String name = paramset.substring( 0, idx );
+                    String value = paramset.substring( idx + 1 );
+
+                    Logging.info( "[ActionAuCharge] name:" + name );
+                    Logging.info( "[ActionAuCharge] value:" + value );
+                    resultMap.put( name, URLDecoder.decode( value, "UTF-8" ) );
+                }
+            }
+            tranId = resultMap.get( "transactionId" );
+            Logging.info( "[ActionAuCharge] transactionId:" + tranId );
+
+            if ( tranId != null && tranId.equals( "" ) == false )
+            {
+                dus.getDataBySuid( openId );
+                dus.setOpenId( openId );
+                dus.setToken( tranId );
+                dus.updateData( dus.getUserId() );
+                tranId = URLEncoder.encode( tranId, "UTF-8" );
+                Logging.info( "[ActionAuCharge] encoded transactionId:" + tranId );
+
+                response.sendRedirect( "https://connect.auone.jp/net/py/mpl_rt_net/cca?ID=UserPermitBridge&transactionId=" + tranId );
+            }
+            else
+            {
+                requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                requestDispatcher.forward( request, response );
+                return;
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionAuCharge] Exception:" + e.toString() );
+        }
+    }
+}

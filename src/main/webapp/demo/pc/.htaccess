@@ -1,0 +1,29 @@
+#<Directory "/hotenavi/usen">
+#    AllowOverride All
+#    ExpiresActive On
+#    ExpiresDefault "access plus 1 second"
+#    Options +Includes
+Order deny,allow
+deny from all
+
+SetEnvIf X-Forwarded-For "^125\.63\.42\.(19[3-9]|2[0-1][0-9]|22[0-2])" allowed_access
+
+#allow from 120.74.177.38 125.63.42.192/27 125.63.42.206 223.132.38.214 119.72.
+
+allow from env=allowed_access
+
+AuthName "OwnerSite by Hotenavi"
+AuthType Basic
+require valid-user
+AuthMySQLEnable on
+AuthMySQLHost earth.hotenavi.com
+AuthMySQLDB hotenavi
+AuthMySQLUser hotenavi
+AuthMySQLPassword KB7LWS3Z
+AuthMySQLUserTable hotel
+AuthMySQLNameField owner_user
+AuthMySQLPasswordField owner_password
+AuthMySQLPwEncryption none
+AuthMySQLUserCondition "hotel_id='hotenavi'"
+#</Directory>
+#

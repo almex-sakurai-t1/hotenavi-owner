@@ -1,0 +1,349 @@
+package jp.happyhotel.action;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.CheckString;
+import jp.happyhotel.common.DateEdit;
+import jp.happyhotel.common.HotelIp;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.data.DataApErrorHistory;
+import jp.happyhotel.data.DataApTouchUserPoint;
+import jp.happyhotel.data.DataHotelBasic;
+import jp.happyhotel.data.DataUserBasic;
+import jp.happyhotel.dto.DtoApCommon;
+import jp.happyhotel.dto.DtoApUsePoint;
+import jp.happyhotel.hotel.HotelCi;
+import jp.happyhotel.others.HapiTouchErrorMessage;
+import jp.happyhotel.touch.TouchCi;
+import jp.happyhotel.touch.UseMile;
+import jp.happyhotel.user.UserPointPay;
+import jp.happyhotel.user.UserPointPayTemp;
+
+/**
+ * ハピホテアプリチェックインクラス
+ * 
+ * @author S.Tashiro
+ * @version 1.0 2014/08/26
+ * 
+ */
+
+public class ActionHtUseMile extends BaseAction
+{
+    final int                 TIMEOUT          = 10000;
+    final int                 HOTENAVI_PORT_NO = 7023;
+    final int                 HAPIHOTE_PORT_NO = 7046;
+    final int                 TEMP_USE         = 1;                      // 仮使用
+
+    final String              HTTP             = "http://";
+    final String              CLASS_NAME       = "hapiTouch.act?method=";
+    final int                 RESULT_OK        = 1;
+    final int                 RESULT_NG        = 2;
+    final int                 USE_CODE         = 1000006;
+    final int                 USE_KIND         = 24;
+    private RequestDispatcher requestDispatcher;
+    private DtoApCommon       apCommon;
+    private DtoApUsePoint     apUsePoint;
+
+    /**
+     * ハピホテタッチ
+     * 
+     * @param request リクエスト
+     * @param response レスポンス
+     */
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        // XML出力
+        boolean ret = false;
+        boolean boolAvailable = false;
+        boolean boolMemberOperation = false;
+        boolean boolConnected = false;
+        boolean retUse = false;
+        String paramSeq = "";
+        String roomNo = "";
+        String paramPoint = "";
+        String paramId = "";
+        String userId = "";
+        String frontIp = "";
+        String connectUrl = "";
+        String tagName = "HtUseMile";
+        String hotenaviId = "";
+        String hotelName = "";
+        String paramAllUse = "";
+
+        int usePoint = 0;
+        int nowPoint = 0;
+        int paySeq = 0;
+        int payTempSeq = 0;
+        int errorCode = 0;
+        int subSeq = 0;
+        TouchCi tc = new TouchCi();
+        HotelCi hc = new HotelCi();
+        DataHotelBasic dhb = new DataHotelBasic();
+        DataUserBasic dub = new DataUserBasic();
+        DataApTouchUserPoint dtup = new DataApTouchUserPoint();
+        UserPointPay upp = new UserPointPay();
+        UserPointPayTemp uppt = new UserPointPayTemp();
+        UseMile um = new UseMile();
+        // バックオフィス登録処理を組み込む
+
+        try
+        {
+
+            paramId = request.getParameter( "id" );
+            paramSeq = request.getParameter( "seq" );
+            paramPoint = request.getParameter( "point" );
+            paramAllUse = request.getParameter( "allUse" );
+            Logging.info( "id = " + paramId + ",seq=" + paramSeq + ",point=" + paramPoint + ",allUse=" + paramAllUse, "ActionHtUseMile" );
+
+            if ( paramId == null || paramId.equals( "" ) != false || CheckString.numCheck( paramId ) == false )
+            {
+                paramId = "0";
+            }
+            if ( paramSeq == null || paramSeq.equals( "" ) != false || CheckString.numCheck( paramSeq ) == false )
+            {
+                paramSeq = "0";
+            }
+            if ( paramPoint == null || paramPoint.equals( "" ) != false || CheckString.numCheck( paramPoint ) == false )
+            {
+                paramPoint = "0";
+            }
+            if ( paramAllUse == null || paramAllUse.equals( "" ) != false || CheckString.numCheck( paramAllUse ) == false )
+            {
+                paramAllUse = "0";
+            }
+
+            dhb.getData( Integer.parseInt( paramId ) );
+            hotenaviId = dhb.getHotenaviId();
+            hotelName = dhb.getName();
+
+            ret = hc.getData( Integer.parseInt( paramId ), Integer.parseInt( paramSeq ) );
+            if ( ret != false )
+            {
+                userId = hc.getHotelCi().getUserId();
+                roomNo = hc.getHotelCi().getRoomNo();
+                subSeq = hc.getHotelCi().getSubSeq();
+            }
+
+            // 使用マイル
+            usePoint = Integer.parseInt( paramPoint );
+            // 保有マイル
+            nowPoint = upp.getNowPoint( userId, false );
+            // 使用マイルが保有マイル以下でかつ、タッチが有効の場合のみ、使用可能
+            if ( usePoint <= nowPoint && hc.getHotelCi().getCiStatus() == 0 )
+            {
+                boolAvailable = true;
+            }
+
+            // ホテルのフロントIPを取得
+            frontIp = HotelIp.getFrontIpForUseMile( Integer.parseInt( paramId ) );
+
+            // マイル使用判断がOKだったらマイル使用
+            if ( boolAvailable != false )
+            {
+
+                // ホストへマイル使用通知
+                if ( frontIp.equals( "" ) == false )
+                {
+                    boolConnected = true;
+                    /** （1002）ハピホテ_ハピホテタッチマイル使用電文 **/
+                    um.setSeq( hc.getHotelCi().getSeq() );
+                    um.setMile( Integer.parseInt( paramPoint ) );
+                    um.setNowPoint( nowPoint - usePoint );
+                    um.sendToHost( frontIp, TIMEOUT, HAPIHOTE_PORT_NO, paramId );
+
+                    // 結果がOKであればap_touch_user_pointへ書き込み
+                    if ( um.getResult() == RESULT_OK )
+                    {
+                        ret = true;
+                    }
+                    else
+                    {
+                        ret = false;
+                        errorCode = um.getErrorCode();
+                        if ( errorCode == 0 )
+                            errorCode = HapiTouchErrorMessage.ERR_30202;
+                    }
+                }
+                // ホスト非連動物件はマイルを仮使用
+                else
+                {
+                    ret = true;
+                    boolMemberOperation = true;
+                }
+            }
+            else
+            {
+                ret = false;
+                errorCode = HapiTouchErrorMessage.ERR_30201;
+                // タッチが有効ではない場合、チェックインデータステータス異常のメッセージを設定。
+                if ( hc.getHotelCi().getCiStatus() != 0 )
+                {
+                    errorCode = HapiTouchErrorMessage.ERR_30203;
+                }
+            }
+
+            // 書き込み判断がOKだったら
+            if ( ret != false )
+            {
+                if ( tc.getData( Integer.parseInt( paramId ), Integer.parseInt( paramSeq ) ) != false )
+                {
+
+                    // 事前にタッチデータを更新
+                    tc.getTouchCi().setUsePoint( usePoint );
+                    // マイル使用日付・時刻をセット
+                    tc.getTouchCi().setUseDate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                    tc.getTouchCi().setUseTime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                    // 最終更新日・時刻をセット
+                    tc.getTouchCi().setLastUpdate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                    tc.getTouchCi().setLastUptime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                    tc.getTouchCi().setUseHotenaviId( hotenaviId );
+                    // 仮マイル使用フラグ
+                    if ( boolMemberOperation != false )
+                    {
+                        tc.getTouchCi().setUseTempFlag( TEMP_USE );
+                    }
+                    // 全マイル使用リクエストがあれば
+                    if ( Integer.parseInt( paramAllUse ) == 1 )
+                    {
+                        tc.getTouchCi().setAlluseFlag( 1 );
+                        tc.getTouchCi().setAllusePoint( usePoint );
+                    }
+
+                    ret = tc.getTouchCi().updateData( Integer.parseInt( paramId ), Integer.parseInt( paramSeq ) );
+                    // マイル使用更新成功
+                    if ( ret != false )
+                    {
+                        // hh_hotel_ciに反映
+                        tc.registHotelCi( tc.getTouchCi() );
+                        // hh_hotel_ci に反映したので再度読み込む
+                        hc.getData( Integer.parseInt( paramId ), Integer.parseInt( paramSeq ) );
+                    }
+                }
+                else
+                {
+                    // 事前にタッチデータを更新
+                    hc.getHotelCi().setUsePoint( usePoint );
+                    // マイル使用日付・時刻をセット
+                    hc.getHotelCi().setUseDate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                    hc.getHotelCi().setUseTime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                    // 最終更新日・時刻をセット
+                    hc.getHotelCi().setLastUpdate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                    hc.getHotelCi().setLastUptime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                    hc.getHotelCi().setUseHotenaviId( hotenaviId );
+                    // 仮マイル使用フラグ
+                    if ( boolMemberOperation != false )
+                    {
+                        hc.getHotelCi().setUseTempFlag( TEMP_USE );
+                    }
+                    // 全マイル使用リクエストがあれば
+                    if ( Integer.parseInt( paramAllUse ) == 1 )
+                    {
+                        hc.getHotelCi().setAllUseFlag( 1 );
+                        hc.getHotelCi().setAllUsePoint( usePoint );
+                    }
+                    hc.getHotelCi().updateData( Integer.parseInt( paramId ), Integer.parseInt( paramSeq ), subSeq );
+                }
+                dtup.setUserId( userId );
+                dtup.setId( Integer.parseInt( paramId ) );
+                dtup.setCiSeq( Integer.parseInt( paramSeq ) );
+                dtup.setCode( USE_CODE );
+                dtup.setRegistDate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                dtup.setRegistTime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+
+                // タッチデータマイル挿入処理
+                ret = dtup.insertData();
+
+                // 挿入成功
+                if ( ret != false )
+                {
+                    // uppとupptにマイルをインサート
+                    // データがないため、hh_user_point_pay_tempに使用マイルを追加
+                    payTempSeq = uppt.insertMile( hc.getHotelCi(), USE_CODE, nowPoint );
+                    // hh_user_point_payに使用マイルの追加
+                    paySeq = upp.insertMile( hc.getHotelCi(), USE_CODE, nowPoint );
+
+                    if ( payTempSeq > 0 && paySeq > 0 )
+                    {
+                        dtup.setPaySeq( paySeq );
+                        dtup.setTempSeq( payTempSeq );
+                        dtup.setRegistDate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                        dtup.setRegistTime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                        ret = dtup.updateData( userId, Integer.parseInt( paramId ), Integer.parseInt( paramSeq ), USE_CODE );
+                    }
+                    else
+                    {
+                        ret = false;
+                    }
+                }
+                else
+                {
+                    // データ重複のためインサート失敗している可能性があるのでデータ取得
+                    dtup.getData( userId, Integer.parseInt( paramId ), Integer.parseInt( paramSeq ), USE_CODE );
+
+                    // uppとupptに使用マイルをアップデート
+                    payTempSeq = uppt.updateMile( hc.getHotelCi(), USE_CODE, nowPoint, dtup.getTempSeq() );
+                    paySeq = upp.updateMile( hc.getHotelCi(), USE_CODE, nowPoint, dtup.getPaySeq() );
+
+                    dtup.setPaySeq( paySeq );
+                    dtup.setTempSeq( payTempSeq );
+                    dtup.setRegistDate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                    dtup.setRegistTime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                    ret = dtup.updateData( userId, Integer.parseInt( paramId ), Integer.parseInt( paramSeq ), USE_CODE );
+
+                    if ( payTempSeq > 0 && paySeq > 0 )
+                    {
+                        ret = true;
+                    }
+                }
+            }
+            if ( errorCode != 0 )
+            {
+                // エラー内容を登録
+                DataApErrorHistory daeh = new DataApErrorHistory();
+                daeh.setErrorCode( errorCode );
+                daeh.setErrorSub( 0 );
+                daeh.setHotelName( hotelName );
+                daeh.setHotenaviId( hotenaviId );
+                daeh.setRoomName( roomNo );
+                daeh.setId( Integer.parseInt( paramId ) );
+                daeh.setRegistDate( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+                daeh.setRegistTime( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+                daeh.setTouchSeq( Integer.parseInt( paramSeq ) );
+                daeh.setUserId( userId );
+                daeh.insertData();
+            }
+
+            apCommon = new DtoApCommon();
+            apUsePoint = new DtoApUsePoint();
+
+            // 共通設定
+            apCommon.setHotelName( hotelName );
+            apCommon.setRoomNo( roomNo );
+            apCommon.setSeq( Integer.parseInt( paramSeq ) );
+            apCommon.setId( Integer.parseInt( paramId ) );
+            apCommon.setConnected( boolConnected );
+            apCommon.setErrorCode( errorCode );
+
+            apUsePoint.setApCommon( apCommon );
+            apUsePoint.setResult( ret );
+            apUsePoint.setUserPoint( usePoint );
+            apUsePoint.setErrorCode( errorCode );
+
+            request.setAttribute( "DtoApUsePoint", apUsePoint );
+
+            requestDispatcher = request.getRequestDispatcher( "MileUseResult.jsp" );
+            requestDispatcher.forward( request, response );
+
+        }
+        catch ( Exception exception )
+        {
+            Logging.error( "[ActionHtUseMile] Exception:" + exception.toString() );
+        }
+        finally
+        {
+        }
+    }
+}

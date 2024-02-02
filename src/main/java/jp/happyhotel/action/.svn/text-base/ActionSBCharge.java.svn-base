@@ -1,0 +1,443 @@
+package jp.happyhotel.action;
+
+import java.io.ByteArrayInputStream;
+import java.io.ByteArrayOutputStream;
+import java.io.InputStream;
+import java.io.OutputStream;
+import java.io.StringWriter;
+import java.io.Writer;
+import java.math.BigInteger;
+
+import javax.mail.internet.MimeUtility;
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+import javax.xml.bind.JAXBContext;
+import javax.xml.bind.Marshaller;
+import javax.xml.bind.Unmarshaller;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.DateEdit;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.common.SelectCookie;
+import jp.happyhotel.common.Url;
+import jp.happyhotel.data.DataLoginInfo_M2;
+import jp.happyhotel.data.DataUserSp;
+import jp.happyhotel.others.SBChargeRequest;
+import jp.happyhotel.others.SBChargeRequest2;
+import jp.happyhotel.others.SBChargeResponse;
+import jp.happyhotel.others.SBChargeResponse2;
+import jp.happyhotel.user.UserRegistSBSp;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.methods.PostMethod;
+import org.apache.commons.httpclient.methods.StringRequestEntity;
+
+public class ActionSBCharge extends BaseAction
+{
+    private static final String PROVIDER_CODE      = "9AQK";
+    private static final String SERVICE_CODE       = "3T7JRD45V3UBKQJJWE";
+    private static final String PRICE              = "324";
+    private static final String PRICE2             = "330";
+    private static final String BASE64_SERVICEID   = "44OP44OD44OU44O844Ob44OG44Or77y/44OX44Os44Of44Ki44Og44Kz44O844K5";
+    private final String        SB_CHARGE_URL      = "https://purchase.id.my.softbank.jp/api/";
+    private final String        SB_SECESSION_URL   = "https://po.id.my.softbank.jp/monthlycancel/cancelagree.php?";
+    private final String        MANAGE_ORDER_NO    = "400000";
+    private final int           AMOUNT_CHANGE_DATE = 20191001;
+    private RequestDispatcher   requestDispatcher  = null;
+
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        String actionType = "";
+        Cookie[] cks = null;
+        // 中間ID
+        String openId = "";
+        String returnURL = "";
+        DataLoginInfo_M2 dataLoginInfo_M2;
+        PostMethod method = null;
+        String tranId = "";
+        String providerCode = "";
+        String serviceCode = "";
+        String actionUrl = Url.getSslUrl() + "/phone/";
+        String manageNo = "";
+        String urlOK = "";
+        String urlNG = "";
+        DataUserSp dus;
+        int today = 0;
+        try
+        {
+            today = Integer.parseInt( DateEdit.getDate( 2 ) );
+            // ユーザ情報取得
+            dataLoginInfo_M2 = (DataLoginInfo_M2)request.getAttribute( "LOGIN_INFO" );
+            actionType = request.getParameter( "actiontype" );
+            if ( actionType == null )
+            {
+                actionType = "";
+            }
+
+            // リクエストのデータ出力
+            if ( dataLoginInfo_M2 != null )
+            {
+                Logging.info( "paymember:" + dataLoginInfo_M2.isPaymemberFlag() );
+                Logging.info( "actionType:" + actionType );
+            }
+
+            if ( dataLoginInfo_M2 == null )
+            {
+                // ログアウト状態の場合はエラー
+                requestDispatcher = request.getRequestDispatcher( Url.getUrl() + "/phone/index.jsp" );
+                requestDispatcher.forward( request, response );
+                return;
+            }
+            else if ( dataLoginInfo_M2.isPaymemberFlag() == true )
+            {
+                // 有料会員は登録させない
+                response.sendRedirect( Url.getUrl() + "/phone/index.jsp" );
+                return;
+            }
+
+            if ( actionType.equals( "" ) == false )
+            {
+                if ( actionType.equals( "Charge" ) == true )
+                {
+                    urlOK = "mypage/sb/sbCharge.act?actiontype=ChargeRequest";
+                    urlNG = "mypage/sb/mysoftbank_ng.jsp";
+
+                    // クッキーかopenIdから取得
+                    openId = SelectCookie.getCookieValue( request, "hhsbhappy" );
+                    // 管理番号を発行　400000YYYYMMDDHHMMSS
+                    manageNo = MANAGE_ORDER_NO + DateEdit.getDate( 2 ) + String.format( "%06d", Integer.parseInt( DateEdit.getTime( 1 ) ) );
+
+                    SBChargeRequest requestXml = new SBChargeRequest();
+                    requestXml.setProviderCode( PROVIDER_CODE );
+                    requestXml.setServiceCode( SERVICE_CODE );
+                    requestXml.setServiceUserId( openId );
+
+                    requestXml.setServicerManageNo( manageNo );
+                    // 2019年10月1日であれば、330円をセット
+                    if ( today >= AMOUNT_CHANGE_DATE )
+                    {
+                        requestXml.setAmount( new BigInteger( PRICE2 ) );
+                    }
+                    else
+                    {
+                        requestXml.setAmount( new BigInteger( PRICE ) );
+                    }
+                    // ハッピーホテル＿プレミアムコースをbase64変換してます。
+
+                    requestXml.setCpNote( this.encodeBase64( "ハッピーホテル＿プレミアムコース".getBytes() ) );
+
+                    // OK時のリダイレクトURL
+                    requestXml.setOkURL( actionUrl + urlOK );
+                    // NG時のリダレイクトURL
+                    requestXml.setNgURL( actionUrl + urlNG );
+                    // POSTメソッド作成
+                    method = makeMethod( requestXml, SB_CHARGE_URL + "BeginningBillingDemand", response );
+
+                    // 課金開始要求
+                    executeRequest( method );
+                    // レスポンス作成
+                    SBChargeResponse res = makeResponse( method );
+
+                    Logging.info( "resultStatus:" + res.getResultStatus() +
+                            ", redirectURL:" + res.getRedirectURL() + ", providerCode:" + res.getProviderCode()
+                            + ", serviceCode" + res.getServiceCode() + ", serviceManageNo:" + res.getServicerManageNo()
+                            + ", statusCode:" + res.getStatusCode() + ", serviceUserId:" + res.getServiceUserId()
+                            + ", transactionId:" + res.getTransactionId() );
+
+                    // URL遷移
+                    if ( res.getRedirectURL() != null && res.getRedirectURL().equals( "" ) != true )
+                    {
+                        // dus = new DataUserSp();
+                        // if ( dus.getDataBySuid( openId ) != false )
+                        // {
+                        // if ( res.getTransactionId() != null )
+                        // {
+                        // dus.setToken( res.getTransactionId() );
+                        // dus.updateData( dus.getUserId() );
+                        // }
+                        // }
+                        response.sendRedirect( res.getRedirectURL() );
+                        return;
+                    }
+                    else
+                    {
+                        returnURL = "mysoftbank_ng.jsp?status=" + res.getResultStatus() + "&statuscode=" + res.getStatusCode();
+                        requestDispatcher = request.getRequestDispatcher( returnURL );
+                        requestDispatcher.forward( request, response );
+                        return;
+                    }
+                }
+                else if ( actionType.equals( "ChargeRequest" ) == true )
+                {
+                    dus = new DataUserSp();
+                    // クッキーかopenIdから取得
+                    openId = SelectCookie.getCookieValue( request, "hhsbhappy" );
+
+                    dus.getDataBySuid( openId );
+                    tranId = request.getParameter( "transactionId" );
+
+                    // 課金要求処理
+                    SBChargeRequest2 requestXml = new SBChargeRequest2();
+                    requestXml.setProviderCode( PROVIDER_CODE );
+                    requestXml.setServiceCode( SERVICE_CODE );
+                    requestXml.setServiceUserId( openId );
+                    requestXml.setTransactionId( tranId );
+                    // POSTメソッド作成
+                    method = makeMethod2( requestXml, SB_CHARGE_URL + "ExecuteBillingDemand" );
+                    // 課金要求
+                    executeRequest( method );
+                    // レスポンス作成
+                    SBChargeResponse2 res = makeResponse2( method );
+
+                    // AppErr2010だったら、OKとして扱う
+                    if ( res.getResultStatus().equals( "AppErr" ) != false && res.getStatusCode().equals( "2010" ) != false )
+                    {
+                        res.setResultStatus( "OK" );
+                    }
+
+                    if ( res.getResultStatus().equals( "OK" ) == true )
+                    {
+                        returnURL = "mysoftbank_ok.jsp";
+                        String orderNo = res.getOrderNo();
+                        request.setAttribute( "ORDER_NO", orderNo );
+                        request.setAttribute( "TRAN_ID", tranId );
+
+                        UserRegistSBSp userRegistSB = new UserRegistSBSp();
+                        userRegistSB.registPay( request );
+                    }
+                    else
+                    {
+                        returnURL = "mysoftbank_ng.jsp?status=" + res.getResultStatus() + "&statuscode=" + res.getStatusCode();
+                    }
+                    requestDispatcher = request.getRequestDispatcher( returnURL );
+                    requestDispatcher.forward( request, response );
+                    return;
+                }
+                else if ( actionType.equals( "Retry" ) == true )
+                {
+                    returnURL = "mysoftbank_ok.jsp";
+                    String orderNo = request.getParameter( "orderNo" );
+                    request.setAttribute( "ORDER_NO", orderNo );
+
+                    UserRegistSBSp userRegistSB = new UserRegistSBSp();
+                    userRegistSB.registPay( request );
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionSoftBankCharge execute]Exception:" + e.toString() );
+            try
+            {
+                request.setAttribute( "errMsg", e.toString() );
+                requestDispatcher = request.getRequestDispatcher( "../mysoftbank_login_sp.jsp" );
+                requestDispatcher.forward( request, response );
+            }
+            catch ( Exception ex )
+            {
+            }
+        }
+        finally
+        {
+        }
+    }
+
+    /**
+     * HTTPリクエスト実行
+     * 
+     * @param method 実行POSTメソッド
+     * 
+     */
+    private SBChargeResponse makeResponse(PostMethod method)
+    {
+        SBChargeResponse ret = null;
+
+        try
+        {
+            ret = new SBChargeResponse();
+
+            // HTTPレスポンスのXMLをアンマーシャルして、レスポンスを作成
+            InputStream input = new ByteArrayInputStream( method.getResponseBodyAsString().getBytes() );
+            JAXBContext jaxbContext = JAXBContext.newInstance( SBChargeResponse.class );
+            Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+            ret = (SBChargeResponse)unmarshaller.unmarshal( input );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionSoftBankCharge makeResponse]Exception:" + e.toString() );
+        }
+        finally
+        {
+
+        }
+
+        return(ret);
+    }
+
+    /**
+     * HTTPリクエスト実行
+     * 
+     * @param method 実行POSTメソッド
+     * 
+     */
+    private SBChargeResponse2 makeResponse2(PostMethod method)
+    {
+        SBChargeResponse2 ret = null;
+
+        try
+        {
+            ret = new SBChargeResponse2();
+
+            // HTTPレスポンスのXMLをアンマーシャルして、レスポンスを作成
+            InputStream input = new ByteArrayInputStream( method.getResponseBodyAsString().getBytes() );
+            JAXBContext jaxbContext = JAXBContext.newInstance( SBChargeResponse2.class );
+            Unmarshaller unmarshaller = jaxbContext.createUnmarshaller();
+            ret = (SBChargeResponse2)unmarshaller.unmarshal( input );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionSoftBankCharge makeResponse2]Exception:" + e.toString() );
+        }
+        finally
+        {
+
+        }
+
+        return(ret);
+    }
+
+    /**
+     * HTTPリクエスト実行
+     * 
+     * @param method 実行POSTメソッド
+     * 
+     */
+    private void executeRequest(PostMethod method)
+    {
+        int statusCode = 0;
+
+        try
+        {
+            HttpClient client = new HttpClient();
+            statusCode = client.executeMethod( method );
+
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionSoftBankCharge executeRequest]Exception:" + e.toString() );
+        }
+        finally
+        {
+        }
+
+        return;
+    }
+
+    /**
+     * POSTメソッド作成処理
+     * 
+     * @param req リクエストデータ
+     * @param url 接続URL
+     * @return POSTメソッド
+     */
+    private PostMethod makeMethod2(SBChargeRequest2 req, String url)
+    {
+        PostMethod ret = null;
+
+        try
+        {
+            JAXBContext jaxbContext = JAXBContext.newInstance( SBChargeRequest2.class );
+            Marshaller marshaller = jaxbContext.createMarshaller();
+            marshaller.setProperty( Marshaller.JAXB_ENCODING, "UTF-8" );
+            marshaller.setProperty( Marshaller.JAXB_FORMATTED_OUTPUT, true );
+            // リクエストをマーシャルして、ボディ用のXMLを作成
+            Writer writer = new StringWriter();
+            marshaller.marshal( req, writer );
+            String body = writer.toString();
+            // ヘッダどボディの設定
+            ret = new PostMethod( url );
+            ret.setRequestHeader( "Content-Length", Integer.toString( body.length() ) ); // reqから取得
+            ret.setRequestHeader( "Content-Type", "text/xml; charset=UTF-8" );
+            ret.setRequestHeader( "Connection", "close" );
+            ret.setRequestEntity( new StringRequestEntity( body, null, null ) );
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionSoftBankCharge makeMethod2]Exception:" + e.toString() );
+        }
+        finally
+        {
+
+        }
+
+        return(ret);
+    }
+
+    /**
+     * POSTメソッド作成処理
+     * 
+     * @param req リクエストデータ
+     * @param url 接続URL
+     * @return POSTメソッド
+     */
+    private PostMethod makeMethod(SBChargeRequest req, String url, HttpServletResponse response)
+    {
+        PostMethod ret = null;
+
+        try
+        {
+            JAXBContext jaxbContext = JAXBContext.newInstance( SBChargeRequest.class );
+            Marshaller marshaller = jaxbContext.createMarshaller();
+            marshaller.setProperty( Marshaller.JAXB_ENCODING, "UTF-8" );
+            marshaller.setProperty( Marshaller.JAXB_FORMATTED_OUTPUT, true );
+            // リクエストをマーシャルして、ボディ用のXMLを作成
+            Writer writer = new StringWriter();
+            marshaller.marshal( req, writer );
+            String body = writer.toString();
+
+            Logging.info( "length:" + body.length() );
+            Logging.info( "writer:" + body );
+
+            // ヘッダどボディの設定
+            ret = new PostMethod( url );
+            ret.setRequestHeader( "Content-Length", Integer.toString( body.length() ) ); // reqから取得
+            ret.setRequestHeader( "Content-Type", "text/xml; charset=UTF-8" );
+            ret.setRequestHeader( "Connection", "close" );
+            ret.setRequestEntity( new StringRequestEntity( body, null, null ) );
+            body = body.replaceAll( "\n", "" );
+
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionSoftBankCharge makeMethod]Exception:" + e.toString() );
+        }
+        finally
+        {
+
+        }
+
+        return(ret);
+    }
+
+    /***
+     * base64変換処理
+     * 
+     * @param data
+     * @return
+     * @throws Exception
+     */
+    public String encodeBase64(byte[] data) throws Exception
+    {
+
+        ByteArrayOutputStream forEncode = new ByteArrayOutputStream();
+
+        OutputStream toBase64 = MimeUtility.encode( forEncode, "base64" );
+        toBase64.write( data );
+        toBase64.close();
+
+        return forEncode.toString( "UTF-8" );
+    }
+
+}

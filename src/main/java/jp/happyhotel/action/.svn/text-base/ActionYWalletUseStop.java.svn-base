@@ -1,0 +1,210 @@
+package jp.happyhotel.action;
+
+import java.io.IOException;
+import java.io.InputStream;
+import java.security.MessageDigest;
+import java.util.Calendar;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.common.Url;
+import jp.happyhotel.common.XmlParser;
+import jp.happyhotel.data.DataUserSp;
+import jp.happyhotel.user.UserRegistYWallet;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.HttpVersion;
+import org.apache.commons.httpclient.methods.GetMethod;
+
+public class ActionYWalletUseStop extends BaseAction
+{
+    /**
+    *
+    */
+    private static final String TOP_URL           = Url.getUrl() + "/";
+    private static final String TOP_SSL_URL       = Url.getSslUrl() + "/";
+    private RequestDispatcher   requestDispatcher = null;
+    private static String       PID               = "123600006";                                                                                   // 本番用
+    private static String       APP_ID            = "dj0zaiZpPUtRUllnTElqV0dvTSZkPVlXazlWRUZZYlVjM05EZ21jR285TUEtLSZzPWNvbnN1bWVyc2VjcmV0Jng9ZWM-"; // 本番環境用
+    // private static String PID = "123600005"; // テスト用
+    // private static String APP_ID = "dj0zaiZpPTg3YWZFWjJuVlREeCZkPVlXazlhWE5ZUWtKSE4yY21jR285TUEtLSZzPWNvbnN1bWVyc2VjcmV0Jng9YjE-"; // demo環境用
+    private static String       STOP_URL          = "http://ord.wallet.yahooapis.jp/WalletGateway/V1/stop_now_with_guid";
+    private static String       MD5_URL           = "/WalletGateway/V1/stop_now_with_guid";
+    private static String       HOST              = "ord.wallet.yahooapis.jp";
+    private static String       PGP_KEY           = "qaIW3FWnlBZeY8G_X.bDQAZ2JjHl.IxBorUuMPGM96Q-";
+
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        String userId = "";
+        String queryString = "";
+        String resultStatus = "";
+        String url = "";
+        int nType = 0;
+        int deviceType = 0;
+        boolean ret = false;
+        long time = 0;
+        DataUserSp dus = new DataUserSp();
+        String openId = "";
+        String md5 = "";
+        UserRegistYWallet registYW;
+
+        try
+        {
+            Logging.info( "[ActionYWalletUseStop] Loaded" );
+            userId = request.getParameter( "user_id" );
+            ret = dus.getData( userId );
+            if ( ret != false )
+            {
+                if ( dus.getDelFlag() > 0 || dus.getCarrierKind() != 4 || dus.getChargeFlag() != 1 )
+                {
+                    response.sendRedirect( TOP_URL + "yw_secession_result.jsp" );
+                    return;
+                }
+
+                openId = dus.getOpenId();
+            }
+            else
+            {
+                response.sendRedirect( TOP_URL + "yw_secession_result.jsp" );
+                return;
+            }
+
+            // タイムスタンプを取得
+            Calendar calendar = Calendar.getInstance(); // コンストラクタでないので注意。
+            time = calendar.getTimeInMillis();
+
+            // リクエストパラメータを設定します。
+            // パラメータ名は大文字、小文字を区別する為、
+            // 正確に設定する必要があります。
+            // 原則として、送信パラメータはＵＲＬエンコードする必要があります。
+            queryString += "?appid=" + APP_ID;
+            queryString += "&pid=" + PID;
+            queryString += "&guid=" + openId;
+            queryString += "&ts=" + time;
+
+            // MD5を取得
+            md5 = this.getMd5( MD5_URL + queryString + PGP_KEY );
+
+            queryString += "&sig=" + md5;
+
+            // HTTP Client 3.1 を使用することを前提とします。
+            HttpClient client = new HttpClient();
+            client.getParams().setVersion( HttpVersion.HTTP_1_0 );
+            client.getParams().setSoTimeout( 300000 );
+            client.getHttpConnectionManager().getParams().setConnectionTimeout( 300000 );
+            client.getParams().setContentCharset( "UTF-8" );
+
+            // Getメソッドを用いてアクセスする。
+            GetMethod get = new GetMethod( STOP_URL + queryString );
+
+            Logging.info( "[ActionYWalletUseStop] STOP_URL" + STOP_URL + queryString );
+
+            // リクエストヘッダを設定します。
+            //
+            // 以下項目は HTTP-Client により自動的に設定される為、明示的に設定しません。
+            //
+            // ・Host
+            // ・Connection
+            // ・Content-Length
+            //
+            // ※ Content-Type も自動的に設定されますが、「; charset=UTF-8」部分が設定されない為
+            // 明示的に設定を行っています。
+            //
+            // 設定内容の詳細につきましては、Ｉ／Ｆ仕様書に従ってください
+            //
+            get.setRequestHeader( "Accept-Charset", "UTF-8" );
+            get.setRequestHeader( "Content-Type", "application/x-www-form-urlencoded; charset=UTF-8" );
+            get.setRequestHeader( "Host", HOST );
+            // 継続情報登録
+            try
+            {
+                int status = client.executeMethod( get );
+                Logging.info( "[ActionYWalletUseStop] status" + status );
+                if ( status == HttpStatus.SC_OK )
+                {
+
+                    XmlParser parse = null;
+                    // レスポンスをインプットストリームへ
+                    InputStream ins = get.getResponseBodyAsStream();
+                    parse = new XmlParser( ins );
+
+                    resultStatus = parse.getElementValue( "Status", "Status" );
+                    if ( resultStatus.equals( "0" ) )
+                    {
+                        response.sendRedirect( TOP_URL + "yw_secession_result.jsp?result=1" );
+                        return;
+                    }
+                }
+                else
+                {
+                    response.sendRedirect( TOP_URL + "yw_secession_result.jsp" );
+                    return;
+                }
+            }
+            catch ( HttpException e )
+            {
+                response.sendRedirect( TOP_URL + "yw_secession_result.jsp" );
+                return;
+            }
+            catch ( IOException e )
+            {
+                response.sendRedirect( TOP_URL + "yw_secession_result.jsp" );
+                return;
+            }
+            finally
+            {
+                // 以降、応答電文を使用しないため、コネクションをリリースします。
+                get.releaseConnection();
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionYWalletSecession] Exception:" + e.toString() );
+        }
+    }
+
+    /**
+     * MD5変換処理
+     * 
+     * @param message メッセージ
+     * @return 処理結果(null：MD5変換失敗)
+     **/
+    private String getMd5(String message)
+    {
+        byte[] bytePass;
+        String strReturn = null;
+
+        try
+        {
+            MessageDigest md = MessageDigest.getInstance( "MD5" );
+            bytePass = message.getBytes();
+            md.update( bytePass );
+            bytePass = md.digest();
+
+            StringBuffer buff = new StringBuffer();
+            for( int i = 0 ; i < bytePass.length ; i++ )
+            {
+                int val = bytePass[i] & 0xff;
+                if ( val < 16 )
+                {
+                    buff.append( "0" );
+                }
+                buff.append( Integer.toString( val, 16 ) );
+            }
+            strReturn = buff.toString();
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionYWalletUseStop.getMd5()]Exception:" + e.toString() );
+        }
+
+        return(strReturn);
+    }
+
+}

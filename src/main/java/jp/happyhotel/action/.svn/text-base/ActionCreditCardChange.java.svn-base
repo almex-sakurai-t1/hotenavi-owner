@@ -1,0 +1,345 @@
+package jp.happyhotel.action;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.DateEdit;
+import jp.happyhotel.common.GMOPayment;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.data.DataLoginInfo_M2;
+import jp.happyhotel.data.DataUserBasic;
+import jp.happyhotel.data.DataUserCredit;
+import jp.happyhotel.data.DataUserCreditHistory;
+import jp.happyhotel.user.UserCreditInfo;
+
+import com.gmo_pg.g_pay.client.output.ErrHolder;
+import com.gmo_pg.g_pay.client.output.SaveCardOutput;
+
+/**
+ * 
+ * クレジットカード変更処理クラス
+ * 
+ * @author Y.Tanabe
+ * @version 1.0 2011/11/08
+ * @see "about_premium.jsp TOPﾍﾟｰｼﾞなどから最初にｱｸｾｽした際(ﾌﾟﾚﾐｱﾑｺｰｽ説明画面)"
+ * @see "paymember_index.jsp ﾌﾟﾚﾐｱﾑｺｰｽ説明画面で会員登録ﾘﾝｸを選択した際"
+ * @see "paymember_registration.jsp ｷｬﾘｱ登録が完了した際(非会員から入会の場合のみ)"
+ * @see "paymember_complete.jsp 有料会員登録が完了した際"
+ */
+public class ActionCreditCardChange extends BaseAction
+{
+    public static final String                   CARDNO_EMPTY       = "カード番号が入力されていません。";
+    public static final String                   CARDNO_ERROR       = "カード番号が正しくありません。";
+    public static final String                   EXPIRE_EMPTY       = "有効期限が入力されていません。";
+    public static final String                   EXPIRE_ERROR       = "有効期限が正しくありません。";
+    public static final String                   CARDNO_UNKOWN      = "入力されたカード番号は存在しません。";
+    public static final String                   OVER_CASH_ERROR    = "入力されたカードは残高不足です。";
+    public static final String                   OVER_LIMIT_ERROR   = "入力されたカードは限度額オーバーしています。";
+    public static final String                   UCTOUCH_CARD_ERROR = "入力されたカードはお取扱できません。";
+    public static final String                   UNVALID_CARD_ERROR = "入力されたカードは無効です。";
+    public static final String                   OTHER_ERROR        = "カード変更に失敗しました。クレジットカードの番号、有効期限もしくはカードが有効かどうかをご確認ください。";
+
+    // エラー詳細コード対応表
+    private static final HashMap<String, String> ERROR_MAP          = new HashMap<String, String>(){
+                                                                        {
+                                                                            put( "E01170001", CARDNO_EMPTY );
+                                                                            put( "E01170003", CARDNO_ERROR );
+                                                                            put( "E01170006", CARDNO_ERROR );
+                                                                            put( "E01170011", CARDNO_ERROR );
+                                                                            put( "E01180001", EXPIRE_EMPTY );
+                                                                            put( "E01180003", EXPIRE_ERROR );
+                                                                            put( "E01180006", EXPIRE_ERROR );
+                                                                            put( "42G830000", EXPIRE_ERROR );
+                                                                            put( "E01240002", CARDNO_UNKOWN );
+                                                                            put( "42G020000", OVER_CASH_ERROR );
+                                                                            put( "42G040000", OVER_CASH_ERROR );
+                                                                            put( "42G030000", OVER_LIMIT_ERROR );
+                                                                            put( "42G050000", OVER_LIMIT_ERROR );
+                                                                            put( "42G120000", UCTOUCH_CARD_ERROR );
+                                                                            put( "42G220000", UCTOUCH_CARD_ERROR );
+                                                                            put( "42G540000", UCTOUCH_CARD_ERROR );
+                                                                            put( "42G600000", UCTOUCH_CARD_ERROR );
+                                                                            put( "42G960000", UCTOUCH_CARD_ERROR );
+                                                                            put( "42G970000", UCTOUCH_CARD_ERROR );
+                                                                            put( "42G980000", UCTOUCH_CARD_ERROR );
+                                                                            put( "42G990000", UCTOUCH_CARD_ERROR );
+                                                                            put( "42G610000", UNVALID_CARD_ERROR );
+                                                                        }
+                                                                    };
+
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        DataLoginInfo_M2 loginStatus = null;
+        String token = "";
+        String userid = "";
+        // エラー表示リスト
+        ArrayList<String> errorWordList = new ArrayList<String>();
+        boolean successflag = false;
+        String forwardUrl = "";
+        RequestDispatcher requestDispatcher = null;
+        UserCreditInfo creditInfo = null;
+
+        try
+        {
+            loginStatus = (DataLoginInfo_M2)request.getAttribute( "LOGIN_INFO" );
+            if ( loginStatus != null )
+            {
+                userid = loginStatus.getUserId();
+            }
+            // トークン未入力エラー
+            if ( request.getParameter( "token" ) == null || request.getParameter( "token" ).equals( "" ) )
+            {
+                errorWordList.add( CARDNO_ERROR );
+            }
+            else
+            {
+                token = request.getParameter( "token" );
+            }
+
+            // エラーがなければカード変更登録の実行
+            if ( errorWordList.size() == 0 )
+            {
+                errorWordList = change( userid, token );
+            }
+            // 処理が成功したか判定
+            if ( errorWordList.size() > 0 )
+            {
+                creditInfo = new UserCreditInfo();
+                successflag = false;
+                if ( creditInfo.getNgMemberFlag( userid ) )
+                {
+                    forwardUrl = "mypage_credit_change.jsp";
+                }
+                else
+                {
+                    forwardUrl = "mypage_credit_selfchange.jsp";
+                }
+            }
+            else
+            {
+                successflag = true;
+                // クレジット情報を有効にして、ユーザ情報を有料会員に戻す
+                if ( creditInfo == null )
+                {
+                    creditInfo = new UserCreditInfo();
+                }
+                updateUserCredit( userid, creditInfo.getMaxSeq( userid ) );
+                updateUserBasic( userid );
+                forwardUrl = "mypage_credit_change_done.jsp";
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "ActionCreditCardChange.execute() Exception=" + e.toString() );
+            successflag = false;
+            forwardUrl = "credit_change.jsp";
+        }
+        finally
+        {
+            // 履歴の追加
+            createHistory( successflag, userid );
+            // 表示エラー
+            request.setAttribute( "errorlist", errorWordList );
+            requestDispatcher = request.getRequestDispatcher( forwardUrl );
+            try
+            {
+                requestDispatcher.forward( request, response );
+            }
+            catch ( ServletException e )
+            {
+            }
+            catch ( IOException e )
+            {
+            }
+        }
+    }
+
+    /**
+     * 履歴作成処理
+     * 
+     * @param successflag 成否フラグ
+     * @param userid ユーザID
+     */
+    private void createHistory(boolean successflag, String userid)
+    {
+        DataUserCreditHistory history = null;
+        String errcode = "";
+        String errdetailcode = "";
+
+        try
+        {
+            // 履歴の追加
+            history = new DataUserCreditHistory();
+            history.setUser_id( userid );
+            history.setCard_seq_no( 0 );
+            history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+            history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+            if ( !successflag )
+            {
+                errcode = DataUserCreditHistory.COMMON_ERRORCODE;
+                errdetailcode = DataUserCreditHistory.COMMON_ERRORDETAILCODE;
+            }
+            history.setError_code( errcode );
+            history.setError_detail_code( errdetailcode );
+            history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_CHANGE );
+            // レコード追加
+            history.insertData();
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "ActionCreditCardChange.createHistory() Exception=" + e.toString() );
+        }
+        finally
+        {
+        }
+    }
+
+    /**
+     * 変更処理
+     * 
+     * @param userid ユーザID
+     * @param cardNo カード番号
+     * @param expire 有効期限
+     * @return エラーメッセージリスト
+     */
+    private ArrayList<String> change(String userid, String token)
+    {
+        ArrayList<String> ret = new ArrayList<String>();
+        SaveCardOutput cardOutput = null;
+        UserCreditInfo usercredit = null;
+        DataUserCredit data = null;
+        List<ErrHolder> errList = null;
+        GMOPayment payment = new GMOPayment();
+        int beforeDelflag = 0;
+        int beforeChargeflag = 0;
+
+        try
+        {
+            while( true )
+            {
+                // 現在使用しているカードシーケンス番号の取得
+                usercredit = new UserCreditInfo();
+                data = usercredit.getPayMemberUserCredit( userid );
+                // null だったら、クレジットデータの件数からデータを取得する
+                if ( data == null )
+                {
+                    data = new DataUserCredit();
+                    data.getData( userid, usercredit.getUserCreditCount( userid ) );
+                }
+
+                // クレジットカード変更
+                cardOutput = payment.ExecuteSaveCard( userid, data.getCard_seq_no(), token, false );
+
+                if ( cardOutput == null )
+                {
+                    ret.add( OTHER_ERROR );
+                    break;
+                }
+                if ( cardOutput.isErrorOccurred() )
+                {
+                    // エラー時処理
+                    errList = cardOutput.getErrList();
+                    if ( errList == null || errList.size() > 0 )
+                    {
+                        for( int i = 0 ; i < errList.size() ; i++ )
+                        {
+                            if ( ERROR_MAP.containsKey( errList.get( i ).getErrInfo() ) )
+                            {
+                                ret.add( ERROR_MAP.get( errList.get( i ).getErrInfo() ) );
+                            }
+                            else
+                            {
+                                ret.clear();
+                                ret.add( OTHER_ERROR );
+                                break;
+                            }
+                        }
+                    }
+                    else
+                    {
+                        ret.add( OTHER_ERROR );
+                    }
+                }
+                break;
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "ActionCreditCardChange.change() Exception=" + e.toString() );
+            ret.add( OTHER_ERROR );
+        }
+
+        return(ret);
+    }
+
+    /****
+     * カード情報の更新
+     * 
+     * @param userId
+     * @param seq
+     * @return
+     */
+    private boolean updateUserCredit(String userId, int seq)
+    {
+        boolean ret = false;
+        DataUserCredit duc;
+
+        duc = new DataUserCredit();
+        ret = duc.getData( userId, seq );
+        // データが取得できたら更新する
+        try
+        {
+            if ( ret != false )
+            {
+                duc.setCharge_flag( 1 );
+                duc.setDel_flag( 0 );
+                ret = duc.updateData();
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionCreditCharge.updateUserCredit()] Exception:" + e.toString() );
+        }
+        return ret;
+    }
+
+    /***
+     * ユーザ情報の更新
+     * 
+     * @param userId
+     * @return
+     */
+    private boolean updateUserBasic(String userId)
+    {
+
+        boolean ret = false;
+        DataUserBasic dub;
+
+        dub = new DataUserBasic();
+        ret = dub.getData( userId );
+
+        try
+        {
+            // データが取得できたら更新する
+            if ( ret != false )
+            {
+                dub.setRegistStatusPay( 9 );
+                ret = dub.updateData( userId );
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionCreditCharge.updateUserBasic()] Exception:" + e.toString() );
+        }
+        return ret;
+
+    }
+}

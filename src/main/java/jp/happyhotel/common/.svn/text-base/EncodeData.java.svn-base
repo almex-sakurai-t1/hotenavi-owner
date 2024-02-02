@@ -1,0 +1,169 @@
+package jp.happyhotel.common;
+
+import java.io.ByteArrayOutputStream;
+import java.io.OutputStream;
+import java.nio.ByteBuffer;
+import java.security.Key;
+import java.security.MessageDigest;
+import java.security.SecureRandom;
+import java.security.Security;
+import java.util.Arrays;
+
+import javax.crypto.Cipher;
+import javax.crypto.SecretKey;
+import javax.crypto.spec.IvParameterSpec;
+import javax.crypto.spec.SecretKeySpec;
+import javax.mail.internet.MimeUtility;
+
+import org.apache.commons.codec.binary.Base64;
+
+public class EncodeData
+{
+
+    /**
+     * 暗号化処理(AES/CBC/PKCS5Padding方式で暗号化)
+     * 
+     * @param key 暗号キー
+     * @param ivBytes 暗号ベクター
+     * @param encByteStr 暗号化する文字列
+     * @return 復号化された文字列
+     **/
+    public static String encodeString(byte[] key, byte[] ivBytes, String encByteStr)
+    {
+        String strOut = "";
+        byte[] decodeWord = null;
+        byte[] encByteByte = null;
+
+        encByteByte = encByteStr.getBytes();
+        // 秘密鍵の構築
+        Key skey = new SecretKeySpec( key, "AES" );
+
+        try
+        {
+            // 復号を行うアルゴリズム、モード、パディング方式を指定
+            Cipher cipher = Cipher.getInstance( "AES/CBC/PKCS5Padding" );
+            // 初期化
+            cipher.init( Cipher.ENCRYPT_MODE, skey, new IvParameterSpec( ivBytes ) );
+            // 暗号化
+            decodeWord = cipher.doFinal( encByteByte );
+
+            if ( decodeWord != null )
+            {
+                strOut = encodeBase64( decodeWord );
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[EncodeData.encodeString()] Exception:" + e.toString() );
+            return(strOut);
+        }
+        return(strOut);
+    }
+
+    /**
+     * 暗号化処理(AES/CBC/PKCS5Padding方式で暗号化)
+     * 
+     * @param keyStr 暗号キー
+     * @param text 暗号化する文字列
+     * @return 復号化された文字列
+     **/
+    public static String encodeString(String keyStr, String text)
+    {
+        // 暗号化キーをハッシュ化
+        byte[] keyBytes = hash( keyStr, 32 );
+
+        // 暗号化
+        String result = encrypt( text, keyBytes );
+        return result;
+    }
+
+    /**
+     * 暗号化処理(AES/CBC/PKCS5Padding方式で暗号化)
+     * 
+     * @param text 暗号化する文字列
+     * @param keyBytes 暗号キー
+     * 
+     * @return 復号化された文字列
+     **/
+    public static String encrypt(String text, byte[] keyBytes)
+    {
+        // AES256を使用
+        Security.setProperty( "crypto.policy", "unlimited" );
+
+        try
+        {
+            // ivを生成
+            byte[] ivBytes = new byte[16];
+            SecureRandom random = SecureRandom.getInstance( "SHA1PRNG" );
+            random.nextBytes( ivBytes );
+            IvParameterSpec ivspec = new IvParameterSpec( ivBytes );
+
+            // AES256/CBC/PKCS5パディングで暗号化
+            SecretKey secret = new SecretKeySpec( keyBytes, "AES" );
+            Cipher cipher = Cipher.getInstance( "AES/CBC/PKCS5Padding" );
+            cipher.init( Cipher.ENCRYPT_MODE, secret, ivspec );
+            byte[] encryptedBytes = cipher.doFinal( text.getBytes() );
+
+            // ivデータと暗号化データを結合
+            int length = ivBytes.length + encryptedBytes.length;
+            ByteBuffer byteBuffer = ByteBuffer.allocate( length );
+            byteBuffer.put( ivBytes );
+            byteBuffer.put( encryptedBytes );
+            byteBuffer.rewind();
+            byte[] resultBytes = new byte[length];
+            byteBuffer.get( resultBytes );
+
+            // base64エンコード
+            String result = new String( Base64.encodeBase64( resultBytes ) );
+
+            return result;
+        }
+        catch ( Exception e )
+        {
+            e.printStackTrace();
+        }
+        return "";
+    }
+
+    /***
+     * SHA-256でハッシュ化
+     * 
+     * @param value
+     * @param length
+     * @return byte[]
+     * @throws Exception
+     */
+    private static byte[] hash(String value, int length)
+    {
+        byte[] hash = new byte[length];
+        try
+        {
+            MessageDigest digest = MessageDigest.getInstance( "SHA-256" );
+            hash = digest.digest( value.getBytes( "UTF-8" ) );
+        }
+        catch ( Exception e )
+        {
+            e.printStackTrace();
+        }
+        return Arrays.copyOf( hash, 32 );
+    }
+
+    /***
+     * base64変換処理
+     * 
+     * @param data
+     * @return
+     * @throws Exception
+     */
+    public static String encodeBase64(byte[] data) throws Exception
+    {
+
+        ByteArrayOutputStream forEncode = new ByteArrayOutputStream();
+
+        OutputStream toBase64 = MimeUtility.encode( forEncode, "base64" );
+        toBase64.write( data );
+        toBase64.close();
+
+        return forEncode.toString( "iso-8859-1" );
+    }
+}

@@ -1,0 +1,238 @@
+package jp.happyhotel.action;
+
+import java.io.IOException;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.common.SelectCookie;
+import jp.happyhotel.data.DataLoginInfo_M2;
+import jp.happyhotel.data.DataUserSp;
+import jp.happyhotel.user.UserRegistAUSp;
+
+import org.apache.commons.httpclient.HttpClient;
+import org.apache.commons.httpclient.HttpException;
+import org.apache.commons.httpclient.HttpStatus;
+import org.apache.commons.httpclient.HttpVersion;
+import org.apache.commons.httpclient.methods.PostMethod;
+
+/**
+ * 
+ * 継続課金情報登録用サーブレット
+ * 
+ * 継続情報登録が正常に完了した場合、このサーブレットが呼び出されるとします。
+ * オーソリ＆売上確定要求用電文の送受信には『Jakarta Commons HttpClient3.1』を使用。
+ */
+public class ActionAUSecession extends BaseAction
+{
+
+    /**
+     *
+     */
+    private static final long   serialVersionUID  = 8361956393383143181L;
+    private static final String PROVIDER_CODE     = "67812";
+    private static final String SERVICE_CODE      = "10003";
+    private static final String SECURE_KEY        = "r1l9AB5u1MOi0Pe9dfsGjUi9RtDiFgmJ";
+    private static final String PRICE             = "315";
+    private static final String TOP_URL           = "https://ssl.happyhotel.jp/phone/";
+    private static final String MYPAGE            = "mypage/au/";
+    private static final String MANAGE_ORDER_NO   = "300000";
+    private RequestDispatcher   requestDispatcher = null;
+
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        boolean ret = false;
+        String openId = "";
+        String manageNo = "";
+        String tranId = "";
+        DataUserSp dus;
+        DataLoginInfo_M2 dataLoginInfo_M2;
+        try
+        {
+            dus = new DataUserSp();
+            openId = SelectCookie.getCookieValue( request, "hhauhappy" );
+            Logging.info( "[ActionAuSecession] openId:" + openId );
+
+            dataLoginInfo_M2 = (DataLoginInfo_M2)request.getAttribute( "LOGIN_INFO" );
+            if ( dataLoginInfo_M2 == null )
+            {
+                // ログアウト状態の場合はエラー
+                requestDispatcher = request.getRequestDispatcher( "../mysoftbank_nomember.jsp" );
+                requestDispatcher.forward( request, response );
+                return;
+            }
+
+            ret = dus.getDataBySuid( openId );
+            if ( ret != false )
+            {
+                // HTTP Client 3.1 を使用することを前提とします。
+                HttpClient client = new HttpClient();
+                client.getParams().setVersion( HttpVersion.HTTP_1_1 );
+                client.getParams().setSoTimeout( 300000 );
+                client.getHttpConnectionManager().getParams().setConnectionTimeout( 300000 );
+                client.getParams().setContentCharset( "UTF-8" );
+
+                // POSTメソッドを用いてアクセスする。
+                PostMethod post = new PostMethod( "https://connect.auone.jp/net/py/mpl_rt_net/cca" );
+
+                // リクエストパラメータを設定します。
+                // 原則として、送信パラメータはＵＲＬエンコードする必要があります。
+                post.addParameter( "ID", "ContBillCancel" );
+                post.addParameter( "memberId", PROVIDER_CODE );
+                post.addParameter( "serviceId", SERVICE_CODE );
+                post.addParameter( "secureKey", SECURE_KEY );
+                post.addParameter( "continueAccountId", dus.getOrderNo() );
+
+                // リクエストヘッダを設定します。
+                post.setRequestHeader( "Accept-Charset", "UTF-8" );
+                post.setRequestHeader( "Content-Type", "application/x-www-form-urlencoded; charset=UTF-8" );
+
+                // 継続情報登録
+                String responseBody = "";
+                try
+                {
+                    int status = client.executeMethod( post );
+                    Logging.info( "[ActionAuSecession] status:" + status );
+                    Logging.info( "[ActionAuSecession] X-ResultCd:" + post.getResponseHeader( "X-ResultCd" ).getValue() );
+
+                    // レスポンスが正しく返ってきているか確認します。
+
+                    if ( HttpStatus.SC_OK != status )
+                    {
+                        // (b) 継続情報登録エラー処理
+                        requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                        requestDispatcher.forward( request, response );
+                        return;
+                    }
+
+                    // 決済認可要求の処理結果を確認します。
+                    if ( "MPL30000".equals( post.getResponseHeader( "X-ResultCd" ).getValue() ) != false )
+                    {
+                        response.sendRedirect( "auAuthnService.act?loginop=p_ses" );
+                        return;
+                    }
+
+                    // 決済認可要求の処理結果を確認します。
+                    if ( "MPL01000".equals( post.getResponseHeader( "X-ResultCd" ).getValue() ) == false )
+                    {
+                        // (b) 継続情報登録エラー処理
+                        requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                        requestDispatcher.forward( request, response );
+                        return;
+                    }
+
+                    // 正常終了しているので、リクエストボディ部分を取り出します。
+                    responseBody = post.getResponseBodyAsString();
+
+                }
+                catch ( HttpException e )
+                {
+                    requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                    requestDispatcher.forward( request, response );
+                    return;
+                }
+                catch ( IOException e )
+                {
+                    requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+                    requestDispatcher.forward( request, response );
+                    return;
+                }
+                finally
+                {
+                    // 以降、応答電文を使用しないため、コネクションをリリースします。
+                    post.releaseConnection();
+                }
+
+                ret = this.openIDRls( openId );
+                Logging.info( "[ActionAUSecession.openIDRls] : " + ret );
+
+                UserRegistAUSp registAu;
+                registAu = new UserRegistAUSp();
+
+                ret = registAu.secession( request );
+                if ( ret != false )
+                {
+                    requestDispatcher = request.getRequestDispatcher( "ses_ok.jsp" );
+                    requestDispatcher.forward( request, response );
+                    return;
+                }
+            }
+            requestDispatcher = request.getRequestDispatcher( "error.jsp" );
+            requestDispatcher.forward( request, response );
+            return;
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionAuSecession] Exception:" + e.toString() );
+        }
+    }
+
+    /****
+     * ID連携解除処理
+     * 
+     * @param openId
+     * @return
+     */
+    public boolean openIDRls(String openId)
+    {
+        boolean ret = false;
+        PostMethod post = null;
+
+        try
+        {
+            // HTTP Client 3.1 を使用することを前提とします。
+            HttpClient client = new HttpClient();
+            client.getParams().setVersion( HttpVersion.HTTP_1_1 );
+            client.getParams().setSoTimeout( 300000 );
+            client.getHttpConnectionManager().getParams().setConnectionTimeout( 300000 );
+            client.getParams().setContentCharset( "UTF-8" );
+
+            // POSTメソッドを用いてアクセスする。
+            post = new PostMethod( "https://connect.auone.jp/sv/id/hny_rt_api/cca" );
+
+            // リクエストパラメータを設定します。
+            // 原則として、送信パラメータはＵＲＬエンコードする必要があります。
+            post.addParameter( "ID", "OpenIDRls" );
+            post.addParameter( "memberId", PROVIDER_CODE );
+            post.addParameter( "serviceId", SERVICE_CODE );
+            post.addParameter( "secureKey", SECURE_KEY );
+            post.addParameter( "OpenIDList", openId );
+
+            // リクエストヘッダを設定します。
+            post.setRequestHeader( "Accept-Charset", "UTF-8" );
+            post.setRequestHeader( "Content-Type", "application/x-www-form-urlencoded; charset=UTF-8" );
+
+            int status = client.executeMethod( post );
+
+            // レスポンスが正しく返ってきているか確認します。
+            if ( HttpStatus.SC_OK != status )
+            {
+                ret = false;
+            }
+            // 決済認可要求の処理結果を確認します。
+            else if ( "MPL01000".equals( post.getResponseHeader( "X-ResultCd" ).getValue() ) == false )
+            {
+                ret = false;
+            }
+            ret = true;
+
+        }
+        catch ( Exception e )
+        {
+            ret = false;
+            Logging.error( "[ActionAUSecession.openIDRls] Exception:" + e.toString() );
+        }
+        finally
+        {
+            if ( post != null )
+            {
+                // 以降、応答電文を使用しないため、コネクションをリリースします。
+                post.releaseConnection();
+            }
+        }
+        return ret;
+    }
+}

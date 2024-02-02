@@ -1,0 +1,423 @@
+/*
+ * @(#)HttpConnection.java 1.00 2009/06/22 Copyright (C) ALMEX Inc. 2009 HTTP通信クラス
+ */
+
+package jp.happyhotel.common;
+
+import java.io.Serializable;
+import java.net.HttpURLConnection;
+import java.net.URL;
+import java.util.ArrayList;
+import java.util.Enumeration;
+
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.data.DataMasterUseragent;
+
+/**
+ * HTTP通信クラス 指定したURLへHTTP通信を行うクラス
+ * 
+ * @author S.Tashiro
+ * @version 1.00 2009/06/22
+ */
+public class HttpConnection implements Serializable
+{
+
+    /**
+     *
+     */
+    private static final long serialVersionUID = -6827518152165230677L;
+
+    private String            contentType;
+    private int               imageSize;
+    private byte[]            image;
+    private String            coordinate;
+    private String            coordinateUL;
+    private String            coordinateUR;
+    private String            coordinateDL;
+    private String            coordinateDR;
+    private String            sclale;
+
+    /**
+     * データを初期化します。
+     */
+    public HttpConnection()
+    {
+        this.contentType = "";
+        imageSize = 0;
+        coordinate = "";
+        coordinateUL = "";
+        coordinateUR = "";
+        coordinateDL = "";
+        coordinateDR = "";
+        sclale = "";
+    }
+
+    /**
+     * コンテントタイプを取得
+     * 
+     * @return 出力するコンテントタイプ
+     */
+    public String getContentType()
+    {
+        return contentType;
+    }
+
+    /**
+     * 中心地座標を取得
+     * 
+     * @return 中心地の座標
+     */
+    public String getCoordinate()
+    {
+        return coordinate;
+    }
+
+    /**
+     * 地図左下の座標を取得
+     * 
+     * @return 地図の左下の座標を取得
+     */
+    public String getCoordinateDL()
+    {
+        return coordinateDL;
+    }
+
+    /**
+     * 地図右下の座標を取得
+     * 
+     * @return 地図の右下の座標を取得
+     */
+    public String getCoordinateDR()
+    {
+        return coordinateDR;
+    }
+
+    /**
+     * 地図左上の座標を取得
+     * 
+     * @return 地図の左上の座標を取得
+     */
+    public String getCoordinateUL()
+    {
+        return coordinateUL;
+    }
+
+    /**
+     * 地図右上の座標を取得
+     * 
+     * @return 地図の右上の座標を取得
+     */
+    public String getCoordinateUR()
+    {
+        return coordinateUR;
+    }
+
+    /**
+     * 画像イメージ取得
+     * 
+     * @return image
+     */
+    public byte[] getImage()
+    {
+        return image;
+    }
+
+    /**
+     * 画像サイズ取得
+     * 
+     * @return imageSize
+     */
+    public int getImageSize()
+    {
+        return imageSize;
+    }
+
+    /**
+     * 縮尺を取得
+     * 
+     * @return 表示している地図の縮尺
+     */
+    public String getSclale()
+    {
+        return sclale;
+    }
+
+    /**
+     * コンテントタイプをセット
+     * 
+     * @param contentType 設定するコンテントタイプをセット
+     */
+    public void setContentType(String contentType)
+    {
+        this.contentType = contentType;
+    }
+
+    /**
+     * 中心座標をセット
+     * 
+     * @param coordinate 地図の中心地の座標をセット
+     */
+    public void setCoordinate(String coordinate)
+    {
+        this.coordinate = coordinate;
+    }
+
+    /**
+     * 地図左下の座標をセット
+     * 
+     * @param coordinateDL 地図の左下の座標をセット
+     */
+    public void setCoordinateDL(String coordinateDL)
+    {
+        this.coordinateDL = coordinateDL;
+    }
+
+    /**
+     * 地図右下の座標をセット
+     * 
+     * @param coordinateDR 地図の右下の座標をセット
+     */
+    public void setCoordinateDR(String coordinateDR)
+    {
+        this.coordinateDR = coordinateDR;
+    }
+
+    /**
+     * 地図左上の座標をセット
+     * 
+     * @param coordinateUL 地図の左上の座標をセット
+     */
+    public void setCoordinateUL(String coordinateUL)
+    {
+        this.coordinateUL = coordinateUL;
+    }
+
+    /**
+     * 地図右上の座標をセット
+     * 
+     * @param coordinateUR 地図の右上の座標をセット
+     */
+    public void setCoordinateUR(String coordinateUR)
+    {
+        this.coordinateUR = coordinateUR;
+    }
+
+    /**
+     * 画像イメージをセット
+     * 
+     * @param image 設定するimage
+     */
+    public void setImage(byte[] image)
+    {
+        this.image = image;
+    }
+
+    /**
+     * 画像サイズをセット
+     * 
+     * @param imageSize 設定するimageSize
+     */
+    public void setImageSize(int imageSize)
+    {
+        this.imageSize = imageSize;
+    }
+
+    /**
+     * 縮尺をセット
+     * 
+     * @param sclale 設定する地図の縮尺
+     */
+    public void setSclale(String sclale)
+    {
+        this.sclale = sclale;
+    }
+
+    /**
+     * HTTP通信クラス
+     * 
+     * @param request HTTPリクエスト
+     * @param response HTTPレスポンス
+     * @param connectUrl 接続するURL
+     * 
+     * @return 処理結果(TRUE:正常,FALSE:異常)
+     */
+    public boolean urlConnection(HttpServletRequest request, HttpServletResponse response, String connectUrl)
+    {
+        int i;
+        int count;
+        int readCount;
+        int carrierFlag;
+        byte[] readBuff;
+        // byte[] readData;
+        String headerName;
+        String headerValue;
+        URL url;
+        HttpURLConnection urlConn;
+        Enumeration headerNamesEnum;
+        Enumeration headerValueEnum;
+        ArrayList<Byte> readData;
+
+        carrierFlag = UserAgent.getUserAgentType( request );
+        readCount = 0;
+        readData = new ArrayList<Byte>();
+        readBuff = new byte[1024];
+        headerNamesEnum = null;
+        headerValueEnum = null;
+
+        try
+        {
+            // 接続するURLの作成
+            url = new URL( connectUrl );
+            // 接続するオブジェクトの作成
+            urlConn = (HttpURLConnection)url.openConnection();
+            // GETメソッドをセット
+            urlConn.setRequestMethod( "POST" );
+
+            // キャリア別にヘッダを追加する。
+            switch( carrierFlag )
+            {
+                case DataMasterUseragent.CARRIER_DOCOMO:
+                    urlConn.setRequestProperty( "User-Agent", request.getHeader( "User-Agent" ) );
+                    break;
+
+                case DataMasterUseragent.CARRIER_AU:
+                    // ヘッダ情報を列挙型配列にセット
+                    headerNamesEnum = request.getHeaderNames();
+                    urlConn.setRequestProperty( "User-Agent", request.getHeader( "User-Agent" ) );
+
+                    // 次の要素がなくなるまで繰り返す
+                    while( headerNamesEnum.hasMoreElements() != false )
+                    {
+                        // 次のヘッダ名を取得し、ヘッダ名から値を列挙型データへセット
+                        headerName = (String)headerNamesEnum.nextElement();
+                        headerValueEnum = request.getHeaders( headerName );
+
+                        // 次の要素がなくなるまで繰り返す
+                        while( headerValueEnum.hasMoreElements() != false )
+                        {
+                            headerValue = (String)headerValueEnum.nextElement();
+                            // x-up-subno(端末番号のヘッダ)以外のヘッダーをセットしていく
+                            if ( headerName.compareTo( "x-up-subno" ) != 0 )
+                            {
+                                // x-upで始まるヘッダーをセットする
+                                if ( headerName.indexOf( "x-up-" ) >= 0 )
+                                {
+                                    urlConn.setRequestProperty( headerName, headerValue );
+                                }
+                            }
+                        }
+                    }
+                    break;
+
+                case DataMasterUseragent.CARRIER_SOFTBANK:
+                    headerNamesEnum = request.getHeaderNames();
+
+                    urlConn.setRequestProperty( "User-Agent", request.getHeader( "User-Agent" ) );
+
+                    // 次の要素がなくなるまで繰り返す
+                    while( headerNamesEnum.hasMoreElements() != false )
+                    {
+                        // 次のヘッダー名を取得し、ヘッダー名から値を列挙型データへセット
+                        headerName = (String)headerNamesEnum.nextElement();
+                        headerValueEnum = request.getHeaders( headerName );
+                        // 次の要素がなくなるまで繰り返す
+                        while( headerValueEnum.hasMoreElements() != false )
+                        {
+                            headerValue = (String)headerValueEnum.nextElement();
+                            // x-jphone-uid(端末番号のヘッダ)以外のヘッダーをセットしていく
+                            if ( headerName.compareTo( "x-jphone-uid" ) != 0 )
+                            {
+                                // x-jphoneで始まるヘッダーをセットする
+                                if ( headerName.indexOf( "x-jphone-" ) >= 0 )
+                                {
+                                    urlConn.setRequestProperty( headerName, headerValue );
+                                }
+                            }
+                        }
+                    }
+                    break;
+            }
+
+            // 接続
+            urlConn.connect();
+
+            // URLから取得したXMLから座標情報を取得
+            connectUrl += "&output=xml";
+            ReadXml readXml = new ReadXml( connectUrl );
+            readXml.getElementCoordinate();
+
+            // 中心地の座標をセット
+            this.coordinate = readXml.getCoordinate();
+            // 右上の座標をセット
+            this.coordinateUR = readXml.getUr();
+            // 左上の座標をセット
+            this.coordinateUL = readXml.getUl();
+            // 右下の座標をセット
+            this.coordinateDR = readXml.getDr();
+            // 左下の座標をセット
+            this.coordinateDL = readXml.getDl();
+            // 縮尺をセット
+            this.sclale = readXml.getScale();
+
+            // // 取得したコンテントタイプをセット
+            // this.contentType = urlConn.getContentType();
+            //
+            // // 中心地の座標をセット
+            // this.coordinate = urlConn.getHeaderField( "X-Coordinate" );
+            // // 左上の座標をセット
+            // this.coordinateUL = urlConn.getHeaderField( "X-Coordinate-UL" );
+            // // 右上の座標をセット
+            // this.coordinateUR = urlConn.getHeaderField( "X-Coordinate-UR" );
+            // // 左下の座標をセット
+            // this.coordinateDL = urlConn.getHeaderField( "X-Coordinate-DL" );
+            // // 右下の座標をセット
+            // this.coordinateDR = urlConn.getHeaderField( "X-Coordinate-DR" );
+            //
+            // // 縮尺をセット
+            // this.sclale = urlConn.getHeaderField( "X-Scale" );
+
+            // 戻ってきたイメージをByte配列に格納
+            while( true )
+            {
+                count = urlConn.getInputStream().read( readBuff );
+                if ( count == -1 )
+                {
+                    break;
+                }
+
+                for( i = 0 ; i < count ; i++ )
+                {
+                    readData.add( new Byte( readBuff[i] ) );
+                    readCount++;
+                }
+
+            }
+
+            if ( readCount > 0 )
+            {
+                readData.toArray();
+                // 画像の出力
+                this.imageSize = readCount;
+                // 画像のサイズで配列の要素数を決める
+                this.image = new byte[readCount];
+                //
+                for( i = 0 ; i < readCount ; i++ )
+                {
+                    this.image[i] = readData.get( i );
+                }
+                return(true);
+            }
+            else
+            {
+                return(false);
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.info( "[HttpConnetion.urlConnection] Exception=" + e.toString() );
+            return(false);
+        }
+    }
+}

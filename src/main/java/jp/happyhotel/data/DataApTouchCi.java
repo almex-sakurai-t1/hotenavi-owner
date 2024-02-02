@@ -1,0 +1,998 @@
+package jp.happyhotel.data;
+
+import java.io.Serializable;
+import java.sql.Connection;
+import java.sql.PreparedStatement;
+import java.sql.ResultSet;
+
+import jp.happyhotel.common.DBConnection;
+import jp.happyhotel.common.Logging;
+
+/**
+ * ホテルタッチデータ(ap_touch_ci)取得クラス
+ * 
+ * @author Takeshi.Sakurai
+ * @version 1.00 2014/8/13
+ */
+public class DataApTouchCi implements Serializable
+{
+    /**
+     *
+     */
+    private static final long  serialVersionUID = -9068555588635610844L;
+    public static final String TABLE            = "ap_touch_ci";
+    private int                id;                                      // ハピホテホテルID
+    private int                seq;                                     // チェックインコード（ホテルごとの連番）
+    private int                ciDate;                                  //
+    private int                ciTime;                                  //
+    private int                ciStatus;                                // 1:料金取得済
+    private String             userId;                                  //
+    private String             idm;                                     //
+    private int                userSeq;                                 //
+    private int                visitSeq;                                //
+    private int                visitPoint;                              //
+    private int                visitDate;                               //
+    private int                visitTime;                               //
+    private String             visitHotenaviId;                         //
+    private int                visitEmployeeCode;                       //
+    private String             roomNo;                                  //
+    private int                usePoint;                                //
+    private int                useDate;                                 //
+    private int                useTime;                                 //
+    private String             useHotenaviId;                           //
+    private int                useEmployeeCode;                         //
+    private int                slipNo;                                  //
+    private int                amount;                                  //
+    private int                addPoint;                                //
+    private int                addTime;                                 //
+    private int                addDate;                                 //
+    private String             addHotenaviId;                           //
+    private int                addEmployeeCode;                         //
+    private int                lastUpdate;                              //
+    private int                lastUptime;                              //
+    private double             amountRate;                              //
+    private String             rsvNo;                                   //
+    private int                alluseFlag;                              //
+    private int                allusePoint;                             //
+    private int                fixFlag;                                 //
+    private int                userType;                                //
+    private String             ownerHotelId;                            //
+    private int                ownerUserId;                             //
+    private String             customId;                                // ホスト側メンバーID
+    private int                useTempFlag;                             // 1:仮使用（非連動物件用）
+    private int                hostNotification;                        // ホストチェックイン通知ホストチェックイン通知（1:チェックイン通知OK、2:チェックイン通知失敗）
+    private int                extUserFlag;                             // 予約ユーザーの区別(0:ハピホテユーザー1:ハピホテユーザーではない)
+
+    /**
+     * データを初期化します。
+     */
+    public DataApTouchCi()
+    {
+        this.id = 0;
+        this.seq = 0;
+        this.ciDate = 0;
+        this.ciTime = 0;
+        this.ciStatus = 0;
+        this.userId = "";
+        this.idm = "";
+        this.userSeq = 0;
+        this.visitSeq = 0;
+        this.visitPoint = 0;
+        this.visitDate = 0;
+        this.visitTime = 0;
+        this.visitHotenaviId = "";
+        this.visitEmployeeCode = 0;
+        this.roomNo = "";
+        this.usePoint = 0;
+        this.useDate = 0;
+        this.useTime = 0;
+        this.useHotenaviId = "";
+        this.useEmployeeCode = 0;
+        this.slipNo = 0;
+        this.amount = 0;
+        this.addPoint = 0;
+        this.addTime = 0;
+        this.addDate = 0;
+        this.addHotenaviId = "";
+        this.addEmployeeCode = 0;
+        this.lastUpdate = 0;
+        this.lastUptime = 0;
+        this.amountRate = 0;
+        this.rsvNo = "";
+        this.alluseFlag = 0;
+        this.allusePoint = 0;
+        this.fixFlag = 0;
+        this.userType = 0;
+        this.ownerHotelId = "";
+        this.ownerUserId = 0;
+        this.customId = "";
+        this.useTempFlag = 0;
+        this.hostNotification = 0;
+        this.extUserFlag = 0;
+    }
+
+    public int getId()
+    {
+        return id;
+    }
+
+    public int getSeq()
+    {
+        return seq;
+    }
+
+    public int getCiDate()
+    {
+        return ciDate;
+    }
+
+    public int getCiTime()
+    {
+        return ciTime;
+    }
+
+    public int getCiStatus()
+    {
+        return ciStatus;
+    }
+
+    public String getUserId()
+    {
+        return userId;
+    }
+
+    public String getIdm()
+    {
+        return idm;
+    }
+
+    public int getUserSeq()
+    {
+        return userSeq;
+    }
+
+    public int getVisitSeq()
+    {
+        return visitSeq;
+    }
+
+    public int getVisitPoint()
+    {
+        return visitPoint;
+    }
+
+    public int getVisitDate()
+    {
+        return visitDate;
+    }
+
+    public int getVisitTime()
+    {
+        return visitTime;
+    }
+
+    public String getVisitHotenaviId()
+    {
+        return visitHotenaviId;
+    }
+
+    public int getVisitEmployeeCode()
+    {
+        return visitEmployeeCode;
+    }
+
+    public String getRoomNo()
+    {
+        return roomNo;
+    }
+
+    public int getUsePoint()
+    {
+        return usePoint;
+    }
+
+    public int getUseDate()
+    {
+        return useDate;
+    }
+
+    public int getUseTime()
+    {
+        return useTime;
+    }
+
+    public String getUseHotenaviId()
+    {
+        return useHotenaviId;
+    }
+
+    public int getUseEmployeeCode()
+    {
+        return useEmployeeCode;
+    }
+
+    public int getSlipNo()
+    {
+        return slipNo;
+    }
+
+    public int getAmount()
+    {
+        return amount;
+    }
+
+    public int getAddPoint()
+    {
+        return addPoint;
+    }
+
+    public int getAddTime()
+    {
+        return addTime;
+    }
+
+    public int getAddDate()
+    {
+        return addDate;
+    }
+
+    public String getAddHotenaviId()
+    {
+        return addHotenaviId;
+    }
+
+    public int getAddEmployeeCode()
+    {
+        return addEmployeeCode;
+    }
+
+    public int getLastUpdate()
+    {
+        return lastUpdate;
+    }
+
+    public int getLastUptime()
+    {
+        return lastUptime;
+    }
+
+    public double getAmountRate()
+    {
+        return amountRate;
+    }
+
+    public String getRsvNo()
+    {
+        return rsvNo;
+    }
+
+    public int getAlluseFlag()
+    {
+        return alluseFlag;
+    }
+
+    public int getAllusePoint()
+    {
+        return allusePoint;
+    }
+
+    public int getFixFlag()
+    {
+        return fixFlag;
+    }
+
+    public int getUserType()
+    {
+        return userType;
+    }
+
+    public String getOwnerHotelId()
+    {
+        return ownerHotelId;
+    }
+
+    public int getOwnerUserId()
+    {
+        return ownerUserId;
+    }
+
+    public String getCustomId()
+    {
+        return customId;
+    }
+
+    public int getUseTempFlag()
+    {
+        return useTempFlag;
+    }
+
+    public int getHostNotification()
+    {
+        return hostNotification;
+    }
+
+    public int getExtUserFlag()
+    {
+        return extUserFlag;
+    }
+
+    public void setId(int id)
+    {
+        this.id = id;
+    }
+
+    public void setSeq(int seq)
+    {
+        this.seq = seq;
+    }
+
+    public void setCiDate(int ciDate)
+    {
+        this.ciDate = ciDate;
+    }
+
+    public void setCiTime(int ciTime)
+    {
+        this.ciTime = ciTime;
+    }
+
+    public void setCiStatus(int ciStatus)
+    {
+        this.ciStatus = ciStatus;
+    }
+
+    public void setUserId(String userId)
+    {
+        this.userId = userId;
+    }
+
+    public void setIdm(String idm)
+    {
+        this.idm = idm;
+    }
+
+    public void setUserSeq(int userSeq)
+    {
+        this.userSeq = userSeq;
+    }
+
+    public void setVisitSeq(int visitSeq)
+    {
+        this.visitSeq = visitSeq;
+    }
+
+    public void setVisitPoint(int visitPoint)
+    {
+        this.visitPoint = visitPoint;
+    }
+
+    public void setVisitDate(int visitDate)
+    {
+        this.visitDate = visitDate;
+    }
+
+    public void setVisitTime(int visitTime)
+    {
+        this.visitTime = visitTime;
+    }
+
+    public void setVisitHotenaviId(String visitHotenaviId)
+    {
+        this.visitHotenaviId = visitHotenaviId;
+    }
+
+    public void setVisitEmployeeCode(int visitEmployeeCode)
+    {
+        this.visitEmployeeCode = visitEmployeeCode;
+    }
+
+    public void setRoomNo(String roomNo)
+    {
+        this.roomNo = roomNo;
+    }
+
+    public void setUsePoint(int usePoint)
+    {
+        this.usePoint = usePoint;
+    }
+
+    public void setUseDate(int useDate)
+    {
+        this.useDate = useDate;
+    }
+
+    public void setUseTime(int useTime)
+    {
+        this.useTime = useTime;
+    }
+
+    public void setUseHotenaviId(String useHotenaviId)
+    {
+        this.useHotenaviId = useHotenaviId;
+    }
+
+    public void setUseEmployeeCode(int useEmployeeCode)
+    {
+        this.useEmployeeCode = useEmployeeCode;
+    }
+
+    public void setSlipNo(int slipNo)
+    {
+        this.slipNo = slipNo;
+    }
+
+    public void setAmount(int amount)
+    {
+        this.amount = amount;
+    }
+
+    public void setAddPoint(int addPoint)
+    {
+        this.addPoint = addPoint;
+    }
+
+    public void setAddTime(int addTime)
+    {
+        this.addTime = addTime;
+    }
+
+    public void setAddDate(int addDate)
+    {
+        this.addDate = addDate;
+    }
+
+    public void setAddHotenaviId(String addHotenaviId)
+    {
+        this.addHotenaviId = addHotenaviId;
+    }
+
+    public void setAddEmployeeCode(int addEmployeeCode)
+    {
+        this.addEmployeeCode = addEmployeeCode;
+    }
+
+    public void setLastUpdate(int lastUpdate)
+    {
+        this.lastUpdate = lastUpdate;
+    }
+
+    public void setLastUptime(int lastUptime)
+    {
+        this.lastUptime = lastUptime;
+    }
+
+    public void setAmountRate(double amountRate)
+    {
+        this.amountRate = amountRate;
+    }
+
+    public void setRsvNo(String rsvNo)
+    {
+        this.rsvNo = rsvNo;
+    }
+
+    public void setAlluseFlag(int alluseFlag)
+    {
+        this.alluseFlag = alluseFlag;
+    }
+
+    public void setAllusePoint(int allusePoint)
+    {
+        this.allusePoint = allusePoint;
+    }
+
+    public void setFixFlag(int fixFlag)
+    {
+        this.fixFlag = fixFlag;
+    }
+
+    public void setUserType(int userType)
+    {
+        this.userType = userType;
+    }
+
+    public void setOwnerHotelId(String ownerHotelId)
+    {
+        this.ownerHotelId = ownerHotelId;
+    }
+
+    public void setOwnerUserId(int ownerUserId)
+    {
+        this.ownerUserId = ownerUserId;
+    }
+
+    public void setCustomId(String customId)
+    {
+        this.customId = customId;
+    }
+
+    public void setUseTempFlag(int useTempFlag)
+    {
+        this.useTempFlag = useTempFlag;
+    }
+
+    public void setHostNotification(int hostNotification)
+    {
+        this.hostNotification = hostNotification;
+    }
+
+    public void setExtUserFlag(int extUserFlag)
+    {
+        this.extUserFlag = extUserFlag;
+    }
+
+    /****
+     * ホテルタッチデータ(ap_touch_ci)取得
+     * 
+     * @param id ハピホテホテルID
+     * @param seq チェックインコード（ホテルごとの連番）
+     * @return
+     */
+    public boolean getData(int id, int seq)
+    {
+        boolean ret;
+        String query;
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+        ret = false;
+        query = "SELECT * FROM ap_touch_ci WHERE id = ? AND seq = ? ";
+        try
+        {
+            connection = DBConnection.getConnection();
+            prestate = connection.prepareStatement( query );
+            prestate.setInt( 1, id );
+            prestate.setInt( 2, seq );
+            result = prestate.executeQuery();
+            if ( result != null )
+            {
+                if ( result.next() != false )
+                {
+                    this.id = result.getInt( "id" );
+                    this.seq = result.getInt( "seq" );
+                    this.ciDate = result.getInt( "ci_date" );
+                    this.ciTime = result.getInt( "ci_time" );
+                    this.ciStatus = result.getInt( "ci_status" );
+                    this.userId = result.getString( "user_id" );
+                    this.idm = result.getString( "idm" );
+                    this.userSeq = result.getInt( "user_seq" );
+                    this.visitSeq = result.getInt( "visit_seq" );
+                    this.visitPoint = result.getInt( "visit_point" );
+                    this.visitDate = result.getInt( "visit_date" );
+                    this.visitTime = result.getInt( "visit_time" );
+                    this.visitHotenaviId = result.getString( "visit_hotenavi_id" );
+                    this.visitEmployeeCode = result.getInt( "visit_employee_code" );
+                    this.roomNo = result.getString( "room_no" );
+                    this.usePoint = result.getInt( "use_point" );
+                    this.useDate = result.getInt( "use_date" );
+                    this.useTime = result.getInt( "use_time" );
+                    this.useHotenaviId = result.getString( "use_hotenavi_id" );
+                    this.useEmployeeCode = result.getInt( "use_employee_code" );
+                    this.slipNo = result.getInt( "slip_no" );
+                    this.amount = result.getInt( "amount" );
+                    this.addPoint = result.getInt( "add_point" );
+                    this.addTime = result.getInt( "add_time" );
+                    this.addDate = result.getInt( "add_date" );
+                    this.addHotenaviId = result.getString( "add_hotenavi_id" );
+                    this.addEmployeeCode = result.getInt( "add_employee_code" );
+                    this.lastUpdate = result.getInt( "last_update" );
+                    this.lastUptime = result.getInt( "last_uptime" );
+                    this.amountRate = result.getDouble( "amount_rate" );
+                    this.rsvNo = result.getString( "rsv_no" );
+                    this.alluseFlag = result.getInt( "alluse_flag" );
+                    this.allusePoint = result.getInt( "alluse_point" );
+                    this.fixFlag = result.getInt( "fix_flag" );
+                    this.userType = result.getInt( "user_type" );
+                    this.ownerHotelId = result.getString( "owner_hotel_id" );
+                    this.ownerUserId = result.getInt( "owner_user_id" );
+                    this.customId = result.getString( "custom_id" );
+                    this.useTempFlag = result.getInt( "use_temp_flag" );
+                    this.hostNotification = result.getInt( "host_notification" );
+                    this.extUserFlag = result.getInt( "ext_user_flag" );
+                    ret = true;
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[DataApTouchCi.getData] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+        }
+        return(ret);
+    }
+
+    /**
+     * ホテルタッチデータ(ap_touch_ci)設定
+     * 
+     * @param result マスターソートレコード
+     * @return 処理結果(TRUE:正常,FALSE:異常)
+     */
+    public boolean setData(ResultSet result)
+    {
+        try
+        {
+            if ( result != null )
+            {
+                this.id = result.getInt( "id" );
+                this.seq = result.getInt( "seq" );
+                this.ciDate = result.getInt( "ci_date" );
+                this.ciTime = result.getInt( "ci_time" );
+                this.ciStatus = result.getInt( "ci_status" );
+                this.userId = result.getString( "user_id" );
+                this.idm = result.getString( "idm" );
+                this.userSeq = result.getInt( "user_seq" );
+                this.visitSeq = result.getInt( "visit_seq" );
+                this.visitPoint = result.getInt( "visit_point" );
+                this.visitDate = result.getInt( "visit_date" );
+                this.visitTime = result.getInt( "visit_time" );
+                this.visitHotenaviId = result.getString( "visit_hotenavi_id" );
+                this.visitEmployeeCode = result.getInt( "visit_employee_code" );
+                this.roomNo = result.getString( "room_no" );
+                this.usePoint = result.getInt( "use_point" );
+                this.useDate = result.getInt( "use_date" );
+                this.useTime = result.getInt( "use_time" );
+                this.useHotenaviId = result.getString( "use_hotenavi_id" );
+                this.useEmployeeCode = result.getInt( "use_employee_code" );
+                this.slipNo = result.getInt( "slip_no" );
+                this.amount = result.getInt( "amount" );
+                this.addPoint = result.getInt( "add_point" );
+                this.addTime = result.getInt( "add_time" );
+                this.addDate = result.getInt( "add_date" );
+                this.addHotenaviId = result.getString( "add_hotenavi_id" );
+                this.addEmployeeCode = result.getInt( "add_employee_code" );
+                this.lastUpdate = result.getInt( "last_update" );
+                this.lastUptime = result.getInt( "last_uptime" );
+                this.amountRate = result.getDouble( "amount_rate" );
+                this.rsvNo = result.getString( "rsv_no" );
+                this.alluseFlag = result.getInt( "alluse_flag" );
+                this.allusePoint = result.getInt( "alluse_point" );
+                this.fixFlag = result.getInt( "fix_flag" );
+                this.userType = result.getInt( "user_type" );
+                this.ownerHotelId = result.getString( "owner_hotel_id" );
+                this.ownerUserId = result.getInt( "owner_user_id" );
+                this.customId = result.getString( "custom_id" );
+                this.useTempFlag = result.getInt( "use_temp_flag" );
+                this.hostNotification = result.getInt( "host_notification" );
+                this.extUserFlag = result.getInt( "ext_user_flag" );
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[DataApTouchCi.setData] Exception=" + e.toString() );
+        }
+        return(true);
+    }
+
+    /**
+     * ホテルタッチデータ(ap_touch_ci)挿入
+     * 
+     * @see "値のセット後(setXXX)に行うこと"
+     * @return 処理結果(TRUE:正常,FALSE:異常)
+     */
+
+    public boolean insertData()
+    {
+        int i = 1;
+        int result;
+        boolean ret;
+        String query;
+        Connection connection = null;
+        PreparedStatement prestate = null;
+        ret = false;
+
+        query = "INSERT ap_touch_ci SET ";
+        query += " id=?";
+        query += ", seq=?";
+        query += ", ci_date=?";
+        query += ", ci_time=?";
+        query += ", ci_status=?";
+        query += ", user_id=?";
+        query += ", idm=?";
+        query += ", user_seq=?";
+        query += ", visit_seq=?";
+        query += ", visit_point=?";
+        query += ", visit_date=?";
+        query += ", visit_time=?";
+        query += ", visit_hotenavi_id=?";
+        query += ", visit_employee_code=?";
+        query += ", room_no=?";
+        query += ", use_point=?";
+        query += ", use_date=?";
+        query += ", use_time=?";
+        query += ", use_hotenavi_id=?";
+        query += ", use_employee_code=?";
+        query += ", slip_no=?";
+        query += ", amount=?";
+        query += ", add_point=?";
+        query += ", add_time=?";
+        query += ", add_date=?";
+        query += ", add_hotenavi_id=?";
+        query += ", add_employee_code=?";
+        query += ", last_update=?";
+        query += ", last_uptime=?";
+        query += ", amount_rate=?";
+        query += ", rsv_no=?";
+        query += ", alluse_flag=?";
+        query += ", alluse_point=?";
+        query += ", fix_flag=?";
+        query += ", user_type=?";
+        query += ", owner_hotel_id=?";
+        query += ", owner_user_id=?";
+        query += ", custom_id=?";
+        query += ", use_temp_flag=?";
+        query += ", host_notification=?";
+        query += ", ext_user_flag=?";
+        try
+        {
+            connection = DBConnection.getConnection();
+            prestate = connection.prepareStatement( query );
+
+            // 更新対象の値をセットする
+            prestate.setInt( i++, this.id );
+            prestate.setInt( i++, this.seq );
+            prestate.setInt( i++, this.ciDate );
+            prestate.setInt( i++, this.ciTime );
+            prestate.setInt( i++, this.ciStatus );
+            prestate.setString( i++, this.userId );
+            prestate.setString( i++, this.idm );
+            prestate.setInt( i++, this.userSeq );
+            prestate.setInt( i++, this.visitSeq );
+            prestate.setInt( i++, this.visitPoint );
+            prestate.setInt( i++, this.visitDate );
+            prestate.setInt( i++, this.visitTime );
+            prestate.setString( i++, this.visitHotenaviId );
+            prestate.setInt( i++, this.visitEmployeeCode );
+            prestate.setString( i++, this.roomNo );
+            prestate.setInt( i++, this.usePoint );
+            prestate.setInt( i++, this.useDate );
+            prestate.setInt( i++, this.useTime );
+            prestate.setString( i++, this.useHotenaviId );
+            prestate.setInt( i++, this.useEmployeeCode );
+            prestate.setInt( i++, this.slipNo );
+            prestate.setInt( i++, this.amount );
+            prestate.setInt( i++, this.addPoint );
+            prestate.setInt( i++, this.addTime );
+            prestate.setInt( i++, this.addDate );
+            prestate.setString( i++, this.addHotenaviId );
+            prestate.setInt( i++, this.addEmployeeCode );
+            prestate.setInt( i++, this.lastUpdate );
+            prestate.setInt( i++, this.lastUptime );
+            prestate.setDouble( i++, this.amountRate );
+            prestate.setString( i++, this.rsvNo );
+            prestate.setInt( i++, this.alluseFlag );
+            prestate.setInt( i++, this.allusePoint );
+            prestate.setInt( i++, this.fixFlag );
+            prestate.setInt( i++, this.userType );
+            prestate.setString( i++, this.ownerHotelId );
+            prestate.setInt( i++, this.ownerUserId );
+            prestate.setString( i++, this.customId );
+            prestate.setInt( i++, this.useTempFlag );
+            prestate.setInt( i++, this.hostNotification );
+            prestate.setInt( i++, this.extUserFlag );
+            result = prestate.executeUpdate();
+            if ( result > 0 )
+            {
+                if ( this.seq == 0 )
+                {
+                    // AUTO_INCREMENTでインサートした場合、書込んだseqをセットする
+                    ret = GetInsertedData( connection );
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[DataApTouchCi.insertData] Exception=" + e.toString() );
+            ret = false;
+        }
+        finally
+        {
+            DBConnection.releaseResources( prestate );
+            DBConnection.releaseResources( connection );
+        }
+        return(ret);
+    }
+
+    /**
+     * ホテルタッチデータ(ap_touch_ci)更新
+     * 
+     * @see "値のセット後(setXXX)に行うこと"
+     * @param id ハピホテホテルID
+     * @param seq チェックインコード（ホテルごとの連番）
+     * @return
+     */
+    public boolean updateData(int id, int seq)
+    {
+        int i = 1;
+        int result;
+        boolean ret;
+        String query;
+        Connection connection = null;
+        PreparedStatement prestate = null;
+        ret = false;
+        query = "UPDATE ap_touch_ci SET ";
+        query += " ci_date=?";
+        query += ", ci_time=?";
+        query += ", ci_status=?";
+        query += ", user_id=?";
+        query += ", idm=?";
+        query += ", user_seq=?";
+        query += ", visit_seq=?";
+        query += ", visit_point=?";
+        query += ", visit_date=?";
+        query += ", visit_time=?";
+        query += ", visit_hotenavi_id=?";
+        query += ", visit_employee_code=?";
+        query += ", room_no=?";
+        query += ", use_point=?";
+        query += ", use_date=?";
+        query += ", use_time=?";
+        query += ", use_hotenavi_id=?";
+        query += ", use_employee_code=?";
+        query += ", slip_no=?";
+        query += ", amount=?";
+        query += ", add_point=?";
+        query += ", add_time=?";
+        query += ", add_date=?";
+        query += ", add_hotenavi_id=?";
+        query += ", add_employee_code=?";
+        query += ", last_update=?";
+        query += ", last_uptime=?";
+        query += ", amount_rate=?";
+        query += ", rsv_no=?";
+        query += ", alluse_flag=?";
+        query += ", alluse_point=?";
+        query += ", fix_flag=?";
+        query += ", user_type=?";
+        query += ", owner_hotel_id=?";
+        query += ", owner_user_id=?";
+        query += ", custom_id=?";
+        query += ", use_temp_flag=?";
+        query += ", host_notification=?";
+        query += ", ext_user_flag=?";
+        query += " WHERE id=? AND seq=?";
+
+        try
+        {
+            connection = DBConnection.getConnection();
+            prestate = connection.prepareStatement( query );
+            // 更新対象の値をセットする
+            prestate.setInt( i++, this.ciDate );
+            prestate.setInt( i++, this.ciTime );
+            prestate.setInt( i++, this.ciStatus );
+            prestate.setString( i++, this.userId );
+            prestate.setString( i++, this.idm );
+            prestate.setInt( i++, this.userSeq );
+            prestate.setInt( i++, this.visitSeq );
+            prestate.setInt( i++, this.visitPoint );
+            prestate.setInt( i++, this.visitDate );
+            prestate.setInt( i++, this.visitTime );
+            prestate.setString( i++, this.visitHotenaviId );
+            prestate.setInt( i++, this.visitEmployeeCode );
+            prestate.setString( i++, this.roomNo );
+            prestate.setInt( i++, this.usePoint );
+            prestate.setInt( i++, this.useDate );
+            prestate.setInt( i++, this.useTime );
+            prestate.setString( i++, this.useHotenaviId );
+            prestate.setInt( i++, this.useEmployeeCode );
+            prestate.setInt( i++, this.slipNo );
+            prestate.setInt( i++, this.amount );
+            prestate.setInt( i++, this.addPoint );
+            prestate.setInt( i++, this.addTime );
+            prestate.setInt( i++, this.addDate );
+            prestate.setString( i++, this.addHotenaviId );
+            prestate.setInt( i++, this.addEmployeeCode );
+            prestate.setInt( i++, this.lastUpdate );
+            prestate.setInt( i++, this.lastUptime );
+            prestate.setDouble( i++, this.amountRate );
+            prestate.setString( i++, this.rsvNo );
+            prestate.setInt( i++, this.alluseFlag );
+            prestate.setInt( i++, this.allusePoint );
+            prestate.setInt( i++, this.fixFlag );
+            prestate.setInt( i++, this.userType );
+            prestate.setString( i++, this.ownerHotelId );
+            prestate.setInt( i++, this.ownerUserId );
+            prestate.setString( i++, this.customId );
+            prestate.setInt( i++, this.useTempFlag );
+            prestate.setInt( i++, this.hostNotification );
+            prestate.setInt( i++, this.extUserFlag );
+            prestate.setInt( i++, this.id );
+            prestate.setInt( i++, this.seq );
+            result = prestate.executeUpdate();
+            if ( result > 0 )
+            {
+                ret = true;
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[DataApTouchCi.updateData] Exception=" + e.toString() );
+            ret = false;
+        }
+        finally
+        {
+            DBConnection.releaseResources( prestate );
+            DBConnection.releaseResources( connection );
+        }
+        return(ret);
+    }
+
+    /**
+     * ホテルチェックインデータ取得
+     * 
+     * @param licenceKey ライセンスキー
+     * @return 処理結果(TRUE:正常,FALSE:異常)
+     */
+    public int getMaxSeq(int id, String userId)
+    {
+        String query;
+        Connection connection = null;
+        ResultSet result = null;
+        PreparedStatement prestate = null;
+        int maxSeq = 0;
+
+        query = "SELECT MAX(seq) FROM ap_touch_ci WHERE id=? AND user_id=?";
+        try
+        {
+            connection = DBConnection.getConnection();
+            prestate = connection.prepareStatement( query );
+            prestate.setInt( 1, id );
+            prestate.setString( 2, userId );
+            result = prestate.executeQuery();
+            if ( result != null )
+            {
+                if ( result.next() != false )
+                {
+                    maxSeq = result.getInt( 1 );
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[DataHotelCi.getMaxSeq()] Exception=" + e.toString() );
+        }
+        finally
+        {
+            DBConnection.releaseResources( result, prestate, connection );
+        }
+        return(maxSeq);
+    }
+
+    /**
+     * 最後にAUTO INCREMENTで追加したseqをセット
+     * 
+     * @param conn Connection
+     * @return boolean
+     */
+    public boolean GetInsertedData(Connection conn)
+    {
+        String query;
+        PreparedStatement prestate = null;
+        ResultSet result = null;
+        boolean ret = false;
+
+        query = "SELECT @LAST_INSERT_ID AS seq";
+
+        try
+        {
+            prestate = conn.prepareStatement( query );
+            result = prestate.executeQuery();
+            if ( result != null )
+            {
+                if ( result.next() != false )
+                {
+                    this.seq = result.getInt( "seq" );
+                    ret = true;
+                }
+            }
+        }
+        catch ( Exception e )
+        {
+            System.out.println( "[DataApTouchCi.GetInsertedData] Exception=" + e.toString() );
+            ret = false;
+        }
+        return(ret);
+    }
+}

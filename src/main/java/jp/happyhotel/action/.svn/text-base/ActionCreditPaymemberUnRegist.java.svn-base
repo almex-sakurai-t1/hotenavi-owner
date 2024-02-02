@@ -1,0 +1,322 @@
+package jp.happyhotel.action;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.DateEdit;
+import jp.happyhotel.common.GMOPayment;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.data.DataLoginInfo_M2;
+import jp.happyhotel.data.DataUserBasic;
+import jp.happyhotel.data.DataUserCredit;
+import jp.happyhotel.data.DataUserCreditHistory;
+import jp.happyhotel.user.UserCreditInfo;
+
+import com.gmo_pg.g_pay.client.output.DeleteCardOutput;
+import com.gmo_pg.g_pay.client.output.DeleteMemberOutput;
+import com.gmo_pg.g_pay.client.output.SearchCardOutput;
+import com.gmo_pg.g_pay.client.output.SearchCardOutput.CardInfo;
+
+/**
+ * 
+ * クレジット有料会員解約処理クラス
+ * 
+ * @author Y.Tanabe
+ * @version 1.0 2011/11/08
+ * @see "about_premium.jsp TOPﾍﾟｰｼﾞなどから最初にｱｸｾｽした際(ﾌﾟﾚﾐｱﾑｺｰｽ説明画面)"
+ * @see "paymember_index.jsp ﾌﾟﾚﾐｱﾑｺｰｽ説明画面で会員登録ﾘﾝｸを選択した際"
+ * @see "paymember_registration.jsp ｷｬﾘｱ登録が完了した際(非会員から入会の場合のみ)"
+ * @see "paymember_complete.jsp 有料会員登録が完了した際"
+ */
+public class ActionCreditPaymemberUnRegist extends BaseAction
+{
+    public static final String OTHER_ERROR       = "解約に失敗しました。当社ホームページのお問い合わせよりご連絡下さい。";
+    private RequestDispatcher  requestDispatcher = null;
+
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        DataLoginInfo_M2 loginStatus = null;
+        String userid = "";
+        boolean successflag = false;
+        String forwardUrl = "";
+        String paramUidLink = "";
+        RequestDispatcher requestDispatcher = null;
+        // エラー表示リスト
+        ArrayList<String> errorWordList = new ArrayList<String>();
+
+        try
+        {
+            paramUidLink = (String)request.getAttribute( "UID-LINK" );
+            loginStatus = (DataLoginInfo_M2)request.getAttribute( "LOGIN_INFO" );
+            if ( loginStatus != null )
+            {
+                userid = loginStatus.getUserId();
+            }
+            errorWordList = unregist( userid );
+            if ( errorWordList.size() > 0 )
+            {
+                successflag = false;
+                forwardUrl = "mypage_credit_quit.jsp";
+            }
+            else
+            {
+                successflag = true;
+                forwardUrl = "mypage_credit_quit_done.jsp";
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "ActionCreditPaymemberUnRegist.execute() Exception=" + e.toString() );
+            successflag = false;
+            forwardUrl = "mypage_credit_quit.jsp";
+        }
+        finally
+        {
+            // 履歴の追加
+            createHistory( successflag, userid );
+            requestDispatcher = request.getRequestDispatcher( forwardUrl );
+            try
+            {
+                requestDispatcher.forward( request, response );
+            }
+            catch ( ServletException e )
+            {
+            }
+            catch ( IOException e )
+            {
+            }
+        }
+    }
+
+    /**
+     * 履歴作成処理
+     * 
+     * @param successflag 成否フラグ
+     * @param userid ユーザID
+     */
+    private void createHistory(boolean successflag, String userid)
+    {
+        DataUserCreditHistory history = null;
+        String errcode = "";
+        String errdetailcode = "";
+
+        try
+        {
+            // 履歴の追加
+            history = new DataUserCreditHistory();
+            history.setUser_id( userid );
+            history.setCard_seq_no( 0 );
+            history.setGenerate_date( Integer.parseInt( DateEdit.getDate( 2 ) ) );
+            history.setGenerate_time( Integer.parseInt( DateEdit.getTime( 1 ) ) );
+            if ( !successflag )
+            {
+                errcode = DataUserCreditHistory.COMMON_ERRORCODE;
+                errdetailcode = DataUserCreditHistory.COMMON_ERRORDETAILCODE;
+            }
+            history.setError_code( errcode );
+            history.setError_detail_code( errdetailcode );
+            history.setHistory_status( DataUserCreditHistory.HISTORYTYPE_UNREGIST );
+            // レコード追加
+            history.insertData();
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "ActionCreditPaymemberUnRegist.createHistory() Exception=" + e.toString() );
+        }
+        finally
+        {
+        }
+    }
+
+    /**
+     * 解約処理
+     * 
+     * @param userid ユーザID
+     * @return エラーメッセージリスト
+     */
+    private ArrayList<String> unregist(String userid)
+    {
+        ArrayList<String> ret = new ArrayList<String>();
+        UserCreditInfo usercredit = null;
+        DataUserCredit data = null;
+        DataUserBasic dub = null;
+
+        try
+        {
+            if ( userid != null && !userid.equals( "" ) )
+            {
+                // 課金フラグが有効又は初回課金フラグのレコードを取得
+                usercredit = new UserCreditInfo();
+                data = usercredit.getPayMemberUserCredit( userid );
+                // 退会フラグを有効にする
+                data.setDel_flag( DataUserCredit.DELETEFLAG_TRUE );
+                // 登録月と同月内での退会時は初回課金フラグを変更する
+                if ( data.getRegist_date() / 100 == Integer.valueOf( DateEdit.getDate( 2 ) ) / 100 )
+                {
+                    // 初回課金は課金対象に変更
+                    if ( data.getCharge_flag() == DataUserCredit.CHARGEFLAG_FIRSTPAY )
+                    {
+                        data.setCharge_flag( DataUserCredit.CHARGEFLAG_PAY );
+                    }
+                }
+                data.setDel_date( Integer.valueOf( DateEdit.getDate( 2 ) ) );
+                data.setDel_time( Integer.valueOf( DateEdit.getTime( 1 ) ) );
+                // DBのステータス更新
+                if ( data.updateData() )
+                {
+                    // ユーザ基本データを無料会員に更新する
+                    dub = new DataUserBasic();
+                    if ( dub.getData( userid ) )
+                    {
+                        int oldstatus = dub.getRegistStatusOld();
+                        dub.setRegistStatus( oldstatus );
+                        dub.setRegistStatusPay( 0 );
+                        dub.setDelDatePay( Integer.valueOf( DateEdit.getDate( 2 ) ) );
+                        dub.setDelTimePay( Integer.valueOf( DateEdit.getTime( 1 ) ) );
+                        if ( !dub.updateData( userid ) )
+                        {
+                            Logging.error( "[ActionCreditPaymemberUnRegist.unregist()] :有料会員解約" );
+                            ret.add( OTHER_ERROR );
+                        }
+                    }
+                    else
+                    {
+                        Logging.error( "[ActionCreditPaymemberUnRegist.unregist()] : 有料会員解約" );
+                        ret.add( OTHER_ERROR );
+                    }
+                }
+                else
+                {
+                    Logging.error( "[ActionCreditPaymemberUnRegist.unregist()] :有料会員解約" );
+                    ret.add( OTHER_ERROR );
+                }
+            }
+            else
+            {
+                Logging.error( "[ActionCreditPaymemberUnRegist.unregist()] userid=null 有料会員解約" );
+                ret.add( OTHER_ERROR );
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionCreditPaymemberUnRegist.unregist()] Exception=" + e.toString() );
+            ret.add( OTHER_ERROR );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * 
+     * GMO有料会員データ削除処理
+     * 
+     * @param userid ユーザID
+     * @param card_seqno カード登録連番
+     * @return 処理結果(True→成功、False→失敗)
+     * 
+     */
+    private static boolean deleteGmoCreditData(String userid, int card_seqno)
+    {
+        boolean ret = false;
+        GMOPayment gmo = new GMOPayment();
+        SearchCardOutput searh_card = null;
+        DeleteCardOutput delete_card = null;
+        DeleteMemberOutput delete_member = null;
+
+        try
+        {
+            while( true )
+            {
+                // カード照会処理
+                searh_card = gmo.ExecuteSearchCard( userid, card_seqno );
+                if ( searh_card.getCardList().size() <= 0 )
+                {
+                    break;
+                }
+                // カード削除
+                delete_card = gmo.ExecuteDeleteCard( userid, card_seqno );
+                if ( delete_card.getErrList().size() > 0 )
+                {
+                    break;
+                }
+                // 会員削除
+                // delete_member = gmo.ExecuteDeleteMember( userid );
+                // if ( delete_member.getErrList().size() > 0 )
+                // {
+                // break;
+                // }
+                ret = true;
+                break;
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionCreditPaymemberUnRegist.deleteGmoCreditData()] : Exception " + e.toString() );
+        }
+
+        return(ret);
+    }
+
+    /**
+     * 
+     * GMO有料会員データ削除処理
+     * 
+     * @param userid ユーザID
+     * @param card_seqno カード登録連番
+     * @return 処理結果(True→成功、False→失敗)
+     * 
+     */
+    private static boolean deleteGmoCreditData(String memberid)
+    {
+        boolean ret = false;
+        GMOPayment gmo = new GMOPayment();
+        SearchCardOutput search_card = null;
+        DeleteCardOutput delete_card = null;
+        DeleteMemberOutput delete_member = null;
+
+        try
+        {
+            while( true )
+            {
+                // カード照会処理
+                search_card = gmo.ExecuteSearchCard( memberid );
+                List<CardInfo> cardList = search_card.getCardList();
+                if ( cardList.size() <= 0 )
+                {
+                    break;
+                }
+                for( int i = 0 ; i < cardList.size() ; i++ )
+                {
+                    delete_card = gmo.ExecuteDeleteCard( memberid, cardList.get( i ).getCardSeq() );
+                    if ( delete_card.getErrList().size() > 0 )
+                    {
+                        break;
+                    }
+                }
+
+                // 会員削除
+                delete_member = gmo.ExecuteDeleteMember( memberid );
+                if ( delete_member.getErrList().size() > 0 )
+                {
+                    break;
+                }
+                ret = true;
+                break;
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( "[ActionCreditPaymemberUnRegist.deleteGmoCreditData()] : Exception " + e.toString() );
+        }
+
+        return(ret);
+    }
+
+}

@@ -1,0 +1,205 @@
+package jp.happyhotel.action;
+
+import java.io.IOException;
+import java.io.Serializable;
+
+import javax.servlet.ServletException;
+import javax.servlet.http.Cookie;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import jp.happyhotel.common.BaseAction;
+import jp.happyhotel.common.CheckString;
+import jp.happyhotel.common.Logging;
+import jp.happyhotel.common.Url;
+import jp.happyhotel.others.SBProcessor;
+
+import org.openid4java.association.AssociationSessionType;
+import org.openid4java.consumer.ConsumerManager;
+import org.openid4java.consumer.InMemoryConsumerAssociationStore;
+import org.openid4java.consumer.InMemoryNonceVerifier;
+// import org.openid4java.util.HttpClientFactory;
+// import org.openid4java.util.ProxyProperties;
+
+/**
+ * Servlet implementation class SampleAuthnService.
+ */
+public class ActionSBAuthnService extends BaseAction implements Serializable
+{
+    /** long serialVersionUID. */
+    private static final long      serialVersionUID = 2755847743549107596L;
+
+    /** ConsumerManager manager. */
+    private static ConsumerManager cManager;
+    /** String DOCOMO_OP_IDENTIFER. */
+    private final String           SB_OP_IDENTIFER  = "https://id.my.softbank.jp";
+
+    private static final String    TOP_URL          = Url.getUrl() + "/phone/";
+    private String                 MYPAGE_URL       = Url.getSslUrl() + "/phone/mypage/";
+    private String                 MYPAGE_SB_URL    = MYPAGE_URL + "sb/";
+
+    /** リルム */
+    private String                 realm            = Url.getSslUrl() + "/phone/mypage/sb/";
+    /** 戻りURL */
+    private String                 returnTo         = realm + "sbAuthnService.act";
+
+    /**
+     * ConsumerManager Setter.
+     * 
+     * @param manager ConsumerManager.
+     */
+    private static void setManager(ConsumerManager manager)
+    {
+        cManager = manager;
+    }
+
+    @Override
+    public void execute(HttpServletRequest request, HttpServletResponse response)
+    {
+        Logging.info( "start servlet init." );
+        ConsumerManager manager = new ConsumerManager();
+        manager.setAssociations( new InMemoryConsumerAssociationStore() );
+        manager.setNonceVerifier( new InMemoryNonceVerifier( 5000 ) );
+        manager.setMinAssocSessEnc( AssociationSessionType.DH_SHA256 );
+        ActionSBAuthnService.setManager( manager );
+
+        try
+        {
+            this.service( request, response );
+        }
+        catch ( Exception e )
+        {
+        }
+        Logging.info( "end servlet init." );
+
+    }
+
+    /**
+     * @see HttpServlet#service(HttpServletRequest request, HttpServletResponse response)
+     */
+    protected void service(HttpServletRequest request, HttpServletResponse response) throws ServletException,
+            IOException
+    {
+        boolean ret = false;
+        String suid = "";
+        Cookie cookie = null;
+        int kind = 0;
+        String sendUrl = "";
+        String loginOp = "";
+        String paramKind = "";
+        try
+        {
+            loginOp = request.getParameter( "loginop" );
+            paramKind = request.getParameter( "kind" );
+
+            if ( "id_res".equals( request.getParameter( "openid.mode" ) ) )
+            {
+                if ( paramKind != null && paramKind.equals( "" ) == false && CheckString.numCheck( paramKind ) != false )
+                {
+                    request.setAttribute( "kind", Integer.parseInt( paramKind ) );
+                }
+                // OpenID認証応答の場合
+                Logging.info( "do opneid response." );
+                SBProcessor proc = new SBProcessor( cManager, realm, returnTo );
+                String result = proc.doVerifyResponse( request, response );
+                // TODO 認証結果に応じた処理を実装してください
+                if ( result == null )
+                {
+                    // 認証失敗
+                    response.sendRedirect( TOP_URL );
+                    return;
+                }
+                else
+                {
+
+                    kind = (Integer)request.getAttribute( "kind" );
+                    suid = result;
+                    if ( suid.equals( "" ) == false )
+                    {
+                        Logging.info( "Make_Cookie" );
+                        try
+                        {
+                            cookie = new Cookie( "hhsbhappy", suid );
+                            cookie.setDomain( ".happyhotel.jp" );
+                            // 無料会員退会の際にはクッキーを削除させる
+                            if ( kind == 3 )
+                            {
+                                // cookie.setMaxAge( 0 );
+                                cookie.setMaxAge( Integer.MAX_VALUE );
+                            }
+                            else
+                            {
+                                cookie.setMaxAge( Integer.MAX_VALUE );
+                            }
+                            cookie.setPath( "/" );
+                            response.addCookie( cookie );
+                        }
+                        catch ( Exception e )
+                        {
+                            Logging.error( e.toString() );
+                        }
+                    }
+
+                    Logging.info( "kind:" + kind );
+                    Logging.info( "MYPAGE_URL:" + MYPAGE_URL );
+                    Logging.info( "MYPAGE_SB_URL:" + MYPAGE_SB_URL );
+                    // ログインページ
+                    if ( kind == 0 )
+                    {
+                        sendUrl = MYPAGE_URL + "mypage_login_carrier.jsp?kind=3";
+                    }
+                    // 有料会員登録
+                    else if ( kind == 2 )
+                    {
+                        sendUrl = MYPAGE_SB_URL + "regist_pay.jsp";
+                    }
+                    else if ( kind == 4 )
+                    {
+                        sendUrl = MYPAGE_SB_URL + "secession.jsp?kind=4";
+                    }
+                    else
+                    {
+                        sendUrl = TOP_URL;
+                    }
+                    Logging.info( "[REDIRECT_URL] :" + sendUrl );
+                    response.sendRedirect( sendUrl );
+                    return;
+                }
+            }
+            if ( loginOp != null )
+            {
+
+                // ログイン
+                if ( "sb".equals( request.getParameter( "loginop" ) ) )
+                {
+                    returnTo += "?kind=0";
+                }
+                // 有料入会
+                else if ( "p_reg".equals( request.getParameter( "loginop" ) ) )
+                {
+                    returnTo += "?kind=2";
+                }
+                // 有料退会
+                else if ( "p_ses".equals( request.getParameter( "loginop" ) ) )
+                {
+                    returnTo += "?kind=4";
+                }
+                // 画面からSSOの要求があった場合
+                SBProcessor proc = new SBProcessor( cManager, realm, returnTo );
+                proc.doAuthRequest( request, response, SB_OP_IDENTIFER );
+            }
+            else
+            {
+                // その他
+                // request.getRequestDispatcher( "/phone/index.jsp" ).forward( request, response );
+                response.sendRedirect( TOP_URL );
+            }
+        }
+        catch ( Exception e )
+        {
+            Logging.error( e.toString() );
+            throw new ServletException( e );
+        }
+    }
+}

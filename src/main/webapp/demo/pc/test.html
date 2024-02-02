@@ -1,0 +1,615 @@
+<!DOCTYPE HTML PUBLIC "-//W3C//DTD HTML 4.01 Transitional//EN">
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=Windows-31J">
+<title>イベント情報編集</title>
+
+<link href="../../fine001/pc/contents.css" rel="stylesheet" type="text/css">
+
+<link href="http://www.hotenavi.com/fine001/contents.css" rel="stylesheet" type="text/css">
+<link href="../../common/pc/style/contents.css" rel="stylesheet" type="text/css">
+<script type="text/javascript" src="../../common/pc/scripts/edit_form.js"></script>
+<script type="text/javascript" src="../../common/pc/scripts/tohankaku.js"></script>
+
+</head>
+<body leftmargin="0" topmargin="0" marginwidth="0" marginheight="0">
+<table width="100%" border="0" cellpadding="0" cellspacing="0">
+  <tr>
+    <td valign="top"><table width="100%" border="0" cellspacing="0" cellpadding="0">
+      <tr>
+        <td height="20">
+          <table width="100%" height="20" border="0" cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="180" height="20" nowrap bgcolor="#22333F" class="tab"><font color="#FFFFFF"> 編　集</font></td>
+              <td width="15" height="20"><img src="/common/pc/image/tab1.gif" width="15" height="20"></td>
+              <td height="20">
+                <div><img src="/common/pc/image/spacer.gif" width="200" height="20"></div>
+              </td>
+            </tr>
+          </table>
+        </td>
+        <td width="3">&nbsp;</td>
+      </tr>
+      <!-- ここから表 -->
+      <tr>
+        <td align="center" valign="top" class="size10">
+           <table width="100%" border="0" cellspacing="0" cellpadding="0">
+            <tr>
+              <td width="8" class="size10" bgcolor="#FFFFFF"><img src="/common/pc/image/spacer.gif" width="8" height="12"></td>
+              <td>
+                <table width="100%" border="0" cellspacing="0" cellpadding="0" bgcolor="#FFFFFF">
+                  <tr>
+                    <td align="right" class="size10">&nbsp;</td>
+                    <td align="right" class="size10">&nbsp;</td>
+                    <td align="right" class="size10">&nbsp;</td>
+                  </tr>
+
+				<tr>
+					<td align="left" colspan="3" valign="middle" style="font-size:14px;padding:3px;border:1px solid #663333;background-color:#FFFFFF;color:#663333;">
+						<strong>売上日報</strong>
+						&nbsp;&nbsp;<strong>更新</strong>
+					</td>
+				</tr>
+                  <tr>
+                    <td class="red12"></td>
+                    <td align="right" class="size12">&nbsp;</td>
+                    <td align="right" class="size12">&nbsp;</td>
+                  </tr>
+
+                  <tr>
+                    <td colspan="3"  class="size10"><img src="/common/pc/image/spacer.gif" width="200" height="8"></td>
+                  </tr>
+                </table>
+              </div>
+              </td>
+            </tr>
+          </table>
+
+            <table width="100%" border="0" cellspacing="0" cellpadding="0" >
+              <tr>
+                <td  class="size12" bgcolor="#FFFFFF"><img src="/common/pc/image/spacer.gif" width="8" height="12"></td>
+                <td>
+                  <table width="100%" border="0" cellspacing="0" cellpadding="2" >
+                  <form name=form1 method=post>
+                    <tr bgcolor="#FFFFFF">
+                      <td>
+                      <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                        <tr>
+                          <td width="60%" align="center" valign="middle" class="size12" bgcolor="#969EAD">
+                          <input name="regsubmit1" type=button value="下書き保存（非掲載）" onClick="if (validation_range('false','45')){MM_openInput2('event_edit', 'fine001', 45, 1,2)}">
+                          <input name="regsubmit2" type=button value="保存（掲載）" onClick="if (validation_range('false','45')){MM_openInput2('event_edit', 'fine001', 45, 1,1)}">
+
+						  <input name="BackUp" type="checkbox" value="1">Backupを残す
+
+						  </td>
+                          <td width="40%" align="center" valign="middle" class="size12" bgcolor="#969EAD">
+                          <input name="presubmit" type=button value="プレビュー" onClick="MM_openPreview('preview', 45)"></td>
+                        </tr>
+                      </table>
+                      </td>
+                    </tr>
+                  <tr align="left" bgcolor="#FFFFFF">
+                    <td  class="size12">
+                      <div align="left" class="size12" style="CLEAR: both; FLOAT: left;color:black">
+						表示期間：<input name="col_start_yy" type="text" size="4" maxlength="4" value="2013" onChange="setDayRange(this,'20130220','29991231');" style="text-align:right;">年<input name="col_start_mm" type="text" size="2" maxlength="2" value="2"  onchange="setDayRange(this,'20130220','29991231');" style="text-align:right;">月<input name="col_start_dd" type="text" size="2" maxlength="2" value="20"  onchange="setDayRange(this,'20130220','29991231');" style="text-align:right;">日
+						<input name="col_start_hour"   type="text" size="2" maxlength="2" value="13" style="text-align:right;" onChange="setTimeRange(this,'135900','235959');">:<input name="col_start_minute" type="text" size="2" maxlength="2" value="59" style="text-align:right;" onChange="setTimeRange(this,'135900','235959');">
+						～
+						<input name="col_end_yy" type="text" size="4" maxlength="4"  value="9999"  onchange="setDayRange(this,'20130220','29991231');" style="text-align:right;">年<input name="col_end_mm" type="text" size="2" maxlength="2" value="99"  onchange="setDayRange(this,'20130220','29991231');" style="text-align:right;">月<input name="col_end_dd" type="text" size="2" maxlength="2" value="99"  onchange="setDayRange(this,'20130220','29991231');" style="text-align:right;">日
+						<input name="col_end_hour"   type="text" size="2" maxlength="2" value="23" style="text-align:right;" onChange="setTimeRange(this,'135900','235959');">:<input name="col_end_minute" type="text" size="2" maxlength="2" value="59" style="text-align:right;" onChange="setTimeRange(this,'135900','235959');">
+						<img src="/common/pc/image/spacer.gif" width="25" height="8">
+                      </div>
+                    </td>
+                  </tr>
+                  <tr align="left" bgcolor="#FFFFFF">
+                    <td><img src="/common/pc/image/spacer.gif" width="200" height="8"></td>
+                  </tr>
+
+                  <tr align="left" >
+
+					<td>
+						<table cellspacing="0" cellpadding="0" class="subtitlebar_basecolor" width="100%">
+							<tr valign="middle">
+								<td width="7" class="subtitlebar_linecolor"><img src="../../common/pc/image/spacer.gif" width="7" height="18"></td>
+								<td width="3" ><img src="../../common/pc/image/spacer.gif" width="3" height="18"></td>
+								<td width="3" class="subtitlebar_linecolor" ><img src="../../common/pc/image/spacer.gif" width="3" height="18"></td>
+								<td>
+									<div class="subtitle_text" id="title_big"  style="color:">
+										コンテンツ名：<input name="col_title" type="text" size="64" value="売上日報" onChange="CheckEdit();">
+									</div>
+								</td>
+							</tr>
+						</table>
+					</td>
+
+
+                  </tr>
+                  <tr align="left" bgcolor="#FFFFFF">
+                    <td><img src="/common/pc/image/spacer.gif" width="200" height="8"></td>
+                  </tr>
+<!--小見出しここから(1) -->
+<style type="text/css">
+.midashi {
+	font-size:19px;
+	font-family:Arial;
+	font-weight:bold;
+	-moz-border-radius:5px;
+	-webkit-border-radius:5px;
+	border-radius:5px;
+	border:2px solid #268a16;
+	padding:6px 57px;
+	text-decoration:none;
+	background:-webkit-gradient( linear, left top, left bottom, color-stop(10%, #77d42a), color-stop(95%, #5cb811) );
+	background:-moz-linear-gradient( center top, #77d42a 10%, #5cb811 95% );
+	background:-ms-linear-gradient( top, #77d42a 10%, #5cb811 95% );
+	filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#77d42a', endColorstr='#5cb811');
+	background-color:#77d42a;
+	color:#101f04;
+	display:inline-block;
+	text-shadow:0px -2px 1px #aade7c;
+ 	-webkit-box-shadow:inset 12px 34px 27px -5px #caefab;
+ 	-moz-box-shadow:inset 12px 34px 27px -5px #caefab;
+ 	box-shadow:inset 12px 34px 27px -5px #caefab;
+}.midashi:hover {
+	background:-webkit-gradient( linear, left top, left bottom, color-stop(10%, #5cb811), color-stop(95%, #77d42a) );
+	background:-moz-linear-gradient( center top, #5cb811 10%, #77d42a 95% );
+	background:-ms-linear-gradient( top, #5cb811 10%, #77d42a 95% );
+	filter:progid:DXImageTransform.Microsoft.gradient(startColorstr='#5cb811', endColorstr='#77d42a');
+	background-color:#5cb811;
+}.midashi:active {
+	position:relative;
+	top:1px;
+}
+.tabletop
+{
+	font-family: "ＭＳ ゴシック", "Osaka－等幅";
+	font-size: 12px;
+	text-decoration: none;
+	background-color: #36F;
+	color: white;
+	padding: 3px;
+	text-align: center;
+}
+.bb
+{
+	border-bottom: 1px solid black;
+}
+.bl
+{
+	border-left: 1px solid black;
+}
+.br
+{
+	border-right: 1px solid black;
+}
+.bt
+{
+	border-top: 1px solid black;
+}
+</style>
+				<tr>
+
+					<td class="honbuntitlebar">
+						<table width="100%" border="0" cellpadding="0" cellspacing="0" height="16">
+							<tr>
+								<td class="honbuntatitlebar_text">
+									<div id="msg_title_1" style="color:">
+										（1）：<select id="spansize1" name="spansize1" onfocus="ColFunc(1,'fine001',45);" onchange="if(spansize1.selectedIndex !=0){enclose('<font size=&quot;' + spansize1.options[spansize1.selectedIndex].value + '&quot;>', '</font>');spansize1.selectedIndex=0;return false;}">
+									<option value="">ヘッダー</option><option value="1">明細</option><option value="3">フッター</option></select>
+										繰り返し：<select id="spansize1" name="spansize1" onfocus="ColFunc(1,'fine001',45);" onchange="if(spansize1.selectedIndex !=0){enclose('<font size=&quot;' + spansize1.options[spansize1.selectedIndex].value + '&quot;>', '</font>');spansize1.selectedIndex=0;return false;}">
+									<option value="">1</option></select>
+									利用クラス:<input type="text" value="">
+									</div>
+								</td>
+							</tr>
+						</table>
+					</td>
+
+				</tr>
+				<tr align="left" bgcolor="#FFFFFF">
+					<td class="size10"><img src="/common/pc/image/spacer.gif" width="200" height="3"></td>
+                </tr>
+				<tr align="left" bgcolor="#FFFFFF">
+					<td class="honbuntitlebar_text">
+						<div>
+							<textarea  id="col_msg1" name=col_msg1 rows=10 cols=164 onchange="CheckEdit();" onfocus="ColFunc(1,'fine001',45);get_pos(col_msg1);" onkeyup="ColFunc(1,'fine001',45);get_pos(col_msg1);" onmouseup="get_pos(col_msg1);" onmousedown="ColFunc(1,'fine001',45);" onblur="dispArea1.innerHTML='';">
+<table width='98%' border='0' cellspacing='1' cellpadding='3' class='hyouyou_bordercolor honbun'>
+<center>
+<div class="midashi">売 上 日 報</div>
+</center>
+<div class="honbun" style="font-size:18px">営業日：%DateEigyou%（%DateEigyouWeek%）</div>
+<tr>
+<td class="tabletop bt bl bb" rowspan=2>店　舗　名</td>
+<td class="tabletop bt bl bb" rowspan=2>天　候</td>
+<td class="tabletop bt bl bb" colspan=5 style="text-align:center">売　上　高</td>
+<td class="tabletop bt bl bb" colspan=4 style="text-align:center">客　　数</td>
+<td class="tabletop bt bl bb" colspan=4 style="text-align:center">組　　数</td>
+<td class="tabletop bt bl bb" colspan=2 style="text-align:center">客単価</td>
+<td class="tabletop bt bl bb br" colspan=2 style="text-align:center">ランチ客単価</td>
+</tr>
+<tr>
+<td class="tabletop bl bb">当日</td>
+<td class="tabletop bl bb">当月累計</td>
+<td class="tabletop bl bb">前年同月</td>
+<td class="tabletop bl bb">前年比</td>
+<td class="tabletop bl bb">予算比</td>
+<td class="tabletop bl bb">当日</td>
+<td class="tabletop bl bb">当月累計</td>
+<td class="tabletop bl bb">前年同月</td>
+<td class="tabletop bl bb">前年比</td>
+<td class="tabletop bl bb">当日</td>
+<td class="tabletop bl bb">当月累計</td>
+<td class="tabletop bl bb">前年同月</td>
+<td class="tabletop bl bb">前年比</td>
+<td class="tabletop bl bb">当月累計</td>
+<td class="tabletop bl bb">前年比</td>
+<td class="tabletop bl bb">当月累計</td>
+<td class="tabletop bl bb br">前年比</td>
+</tr>
+</table></textarea>
+						</div> 
+					</td>
+				</tr>
+				<tr bgcolor="#FFFFFF">
+					<td align="left" valign="top">
+						<div class="size12">
+						<table border="0" cellpadding="0" cellspacing="0">
+						<tr>
+							<td class="size12">
+								<select id="spansize1" name="spansize1" onfocus="ColFunc(1,'fine001',45);" onchange="if(spansize1.selectedIndex !=0){enclose('<font size=&quot;' + spansize1.options[spansize1.selectedIndex].value + '&quot;>', '</font>');spansize1.selectedIndex=0;return false;}">
+									<option value="">文字サイズ</option><option value="1">小さく</option><option value="3">少し大きく</option><option value="4">大きく</option><option value="5">とても大きく</option></select>
+								<input type="button" name="strong1" value="太" style="font-weight:bold" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<strong>', '</strong>');return false;">
+								<input type="button" name="em1" value="斜" style="font-style:oblique" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<em>', '</em>');return false;">
+								<input type="button" name="under1" value="線" style="text-decoration:underline" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<u>', '</u>');return false;">
+							</td>
+							<td class="size12">
+<input type="image" border="0" style="margin:1px;margin-left:5px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#000000&quot;>', '</font>');return false;" src="/common/pc/image/000000.gif" alt="black"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#FF0000&quot;>', '</font>');return false;" src="/common/pc/image/FF0000.gif" alt="red"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#FF1493&quot;>', '</font>');return false;" src="/common/pc/image/FF1493.gif" alt="deeppink"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#800080&quot;>', '</font>');return false;" src="/common/pc/image/800080.gif" alt="purple"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#0000FF&quot;>', '</font>');return false;" src="/common/pc/image/0000FF.gif" alt="blue"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#008000&quot;>', '</font>');return false;" src="/common/pc/image/008000.gif" alt="green"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#808000&quot;>', '</font>');return false;" src="/common/pc/image/808000.gif" alt="olive"/><br/>
+<input type="image" border="0" style="margin:1px;margin-left:5px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#FFFFFF&quot;>', '</font>');return false;" src="/common/pc/image/FFFFFF.gif" alt="white"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#FA8072&quot;>', '</font>');return false;" src="/common/pc/image/FA8072.gif" alt="salmon"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#EE82EE&quot;>', '</font>');return false;" src="/common/pc/image/EE82EE.gif" alt="violet"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#9370DB&quot;>', '</font>');return false;" src="/common/pc/image/9370DB.gif" alt="mediumpurple"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#00BFFF&quot;>', '</font>');return false;" src="/common/pc/image/00BFFF.gif" alt="deepskyblue"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#33CC33&quot;>', '</font>');return false;" src="/common/pc/image/33CC33.gif" alt="limegreen"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#FFD700&quot;>', '</font>');return false;" src="/common/pc/image/FFD700.gif" alt="gold"/>
+							</td>
+							<td>
+								<input type="hidden" id="spancol1" name="spancol1" value="#" size=7 maxlength="7" onfocus="ColFunc(1,'fine001',45);" >
+								<!--							<input type="button" name="spanbtn1" value="色" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<span style=&quot;color:' + document.getElementById('spancol1').value+'&quot;>', '</span>');return false;">-->
+								<img border="0" style="background-color:white" src="/common/pc/image/color_btn.gif" name="color_btn_d1" width="100" height="22" align="absmiddle" id="color_btn_d1" onfocus="ColFunc(1,'fine001',45);" onClick="ColFunc(1,'fine001',45);MM_openBrWindowDetail('../../common/pc/event_edit_select_color.html','色見本','width=240,height=180',1)" onMouseOver="MM_swapImage('color_btn_d1','','/common/pc/image/color_btn_o.gif',1)" onMouseOut="MM_swapImgRestore()">
+							<input type="button" name="hrefbtn1" value="リンク" onfocus="ColFunc(1,'fine001',45);"  onClick="ColFunc(1,'fine001',45); window.open('../../common/pc/event_edit_link.html','リンク先','screenX=300,screenY=400,left=300,top=400,width=240,height=60');">
+							<input type="button" name="imgbtn1" value="画像表示" onfocus="ColFunc(1,'fine001',45);"  onClick="ColFunc(1,'fine001',45);　window.open('event_edit_img.jsp','画像表示','screenX=200,screenY=200,left=200,top=200,width=560,height=400');">
+							<span class="size10">※装飾する場合は、マウス等で装飾したいテキスト範囲を指定してから各ボタンをクリックしてください。</span>
+							</td>
+						</tr>
+						</table>
+						</div>
+					</td>
+				</tr>
+
+<script language="javascript">
+if( String("jadge") ){
+ bl=3;
+} else if( document.getElementById ){
+ bl=4;
+}
+if( document.getElementById("col_msg1").setSelectionRange ){
+  bl=2;
+} else if( document.selection.createRange ){
+  bl=1;
+}
+</script>
+
+				<tr align="left">
+					<td >
+						<div class="honbun" id="dispArea1">
+						</div>
+					</td>
+				</tr>
+
+                <tr align="left" bgcolor="#FFFFFF">
+                    <td><img src="/common/pc/image/spacer.gif" width="200" height="3"></td>
+                </tr>
+
+				<tr>
+					<td class="honbuntitlebar">
+						<table width="100%" border="0" cellpadding="0" cellspacing="0" height="16">
+							<tr>
+								<td class="honbuntatitlebar_text">
+									<div id="msg_title_1" style="color:">
+										（2）：<select id="spansize1" name="spansize1" onfocus="ColFunc(1,'fine001',45);" onchange="if(spansize1.selectedIndex !=0){enclose('<font size=&quot;' + spansize1.options[spansize1.selectedIndex].value + '&quot;>', '</font>');spansize1.selectedIndex=0;return false;}">
+									<option value="">明細</option><option value="1">明細</option><option value="3">フッター</option></select>
+										繰り返し：<select id="spansize1" name="spansize1" onfocus="ColFunc(1,'fine001',45);" onchange="if(spansize1.selectedIndex !=0){enclose('<font size=&quot;' + spansize1.options[spansize1.selectedIndex].value + '&quot;>', '</font>');spansize1.selectedIndex=0;return false;}">
+									<option value="">30</option></select>
+									利用クラス:<input type="text" value="SalesToday">
+									</div>
+								</td>
+							</tr>
+						</table>
+					</td>
+
+				</tr>
+				<tr align="left" bgcolor="#FFFFFF">
+					<td class="size10"><img src="/common/pc/image/spacer.gif" width="200" height="3"></td>
+                </tr>
+				<tr align="left" bgcolor="#FFFFFF">
+					<td class="honbuntitlebar_text">
+						<div>
+							<textarea  id="col_msg2" name=col_msg2 rows=10 cols=164 onchange="CheckEdit();" onfocus="ColFunc(2,'fine001',45);get_pos(col_msg2);" onkeyup="ColFunc(2,'fine001',45);get_pos(col_msg2);" onmouseup="get_pos(col_msg2);" onmousedown="ColFunc(2,'fine001',45);" onblur="dispArea2.innerHTML='';">
+<table>
+<tr>
+<td class="bl bb">%ShopName%</td>
+<td class="bl bb">%Weather%</td>
+<td class="bl bb">%SalesToday%</td>
+<td class="bl bb">%SalesTodayTotal%</td>
+<td class="bl bb">%SalesTodayPrevious%</td>
+<td class="bl bb">%SalesTodayPerPrevious%</td>
+<td class="bl bb">%SalesTodayPerBudget%</td>
+<td class="bl bb">%VisitorsToday%</td>
+<td class="bl bb">%VisitorsTodayTotal%</td>
+<td class="bl bb">%VisitorsTodayPrevious%</td>
+<td class="bl bb">%VisitorsTodayPerPrevious%</td>
+<td class="bl bb">%GroupsToday%</td>
+<td class="bl bb">%GroupsTodayTotal%</td>
+<td class="bl bb">%GroupsTodayPrevious%</td>
+<td class="bl bb">%GroupsTodayPerPrevious%</td>
+<td class="bl bb">%UnitPrice%</td>
+<td class="bl bb">%UnitPricePerPrevious%</td>
+<td class="bl bb">%UnitPriceLunch%</td>
+<td class="bl bb">%UnitPriceLunchPerPrevious%</td>
+</tr>
+</table>
+							</textarea>
+						</div> 
+					</td>
+				</tr>
+
+<script language="javascript">
+if( String("jadge") ){
+ bl=3;
+} else if( document.getElementById ){
+ bl=4;
+}
+if( document.getElementById("col_msg2").setSelectionRange ){
+  bl=2;
+} else if( document.selection.createRange ){
+  bl=1;
+}
+</script>
+				<tr bgcolor="#FFFFFF">
+					<td align="left" valign="top">
+						<div class="size12">
+						<table border="0" cellpadding="0" cellspacing="0">
+						<tr>
+							<td class="size12">
+								<select id="spansize2" name="spansize2" onfocus="ColFunc(2,'fine002',45);" onchange="if(spansize2.selectedIndex !=0){enclose('<font size=&quot;' + spansize2.options[spansize2.selectedIndex].value + '&quot;>', '</font>');spansize2.selectedIndex=0;return false;}">
+									<option value="">文字サイズ</option><option value="2">小さく</option><option value="3">少し大きく</option><option value="4">大きく</option><option value="5">とても大きく</option></select>
+								<input type="button" name="strong2" value="太" style="font-weight:bold" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<strong>', '</strong>');return false;">
+								<input type="button" name="em2" value="斜" style="font-style:oblique" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<em>', '</em>');return false;">
+								<input type="button" name="under2" value="線" style="text-decoration:underline" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<u>', '</u>');return false;">
+							</td>
+							<td class="size12">
+<input type="image" border="0" style="margin:2px;margin-left:5px;" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<font color=&quot;#000000&quot;>', '</font>');return false;" src="/common/pc/image/000000.gif" alt="black"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<font color=&quot;#FF0000&quot;>', '</font>');return false;" src="/common/pc/image/FF0000.gif" alt="red"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<font color=&quot;#FF1493&quot;>', '</font>');return false;" src="/common/pc/image/FF1493.gif" alt="deeppink"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<font color=&quot;#800080&quot;>', '</font>');return false;" src="/common/pc/image/800080.gif" alt="purple"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<font color=&quot;#0000FF&quot;>', '</font>');return false;" src="/common/pc/image/0000FF.gif" alt="blue"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#008000&quot;>', '</font>');return false;" src="/common/pc/image/008000.gif" alt="green"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#808000&quot;>', '</font>');return false;" src="/common/pc/image/808000.gif" alt="olive"/><br/>
+<input type="image" border="0" style="margin:2px;margin-left:5px;" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<font color=&quot;#FFFFFF&quot;>', '</font>');return false;" src="/common/pc/image/FFFFFF.gif" alt="white"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<font color=&quot;#FA8072&quot;>', '</font>');return false;" src="/common/pc/image/FA8072.gif" alt="salmon"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<font color=&quot;#EE82EE&quot;>', '</font>');return false;" src="/common/pc/image/EE82EE.gif" alt="violet"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<font color=&quot;#9370DB&quot;>', '</font>');return false;" src="/common/pc/image/9370DB.gif" alt="mediumpurple"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<font color=&quot;#00BFFF&quot;>', '</font>');return false;" src="/common/pc/image/00BFFF.gif" alt="deepskyblue"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#33CC33&quot;>', '</font>');return false;" src="/common/pc/image/33CC33.gif" alt="limegreen"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#FFD700&quot;>', '</font>');return false;" src="/common/pc/image/FFD700.gif" alt="gold"/>
+							</td>
+							<td>
+								<input type="hidden" id="spancol2" name="spancol2" value="#" size=7 maxlength="7" onfocus="ColFunc(2,'fine002',45);" >
+								<!--							<input type="button" name="spanbtn2" value="色" onfocus="ColFunc(2,'fine002',45);" onclick="enclose('<span style=&quot;color:' + document.getElementById('spancol2').value+'&quot;>', '</span>');return false;">-->
+								<img border="0" style="background-color:white" src="/common/pc/image/color_btn.gif" name="color_btn_d2" width="100" height="22" align="absmiddle" id="color_btn_d2" onfocus="ColFunc(2,'fine002',45);" onClick="ColFunc(2,'fine002',45);MM_openBrWindowDetail('../../common/pc/event_edit_select_color.html','色見本','width=240,height=280',2)" onMouseOver="MM_swapImage('color_btn_d2','','/common/pc/image/color_btn_o.gif',2)" onMouseOut="MM_swapImgRestore()">
+							<input type="button" name="hrefbtn2" value="リンク" onfocus="ColFunc(2,'fine002',45);"  onClick="ColFunc(2,'fine002',45); window.open('../../common/pc/event_edit_link.html','リンク先','screenX=300,screenY=400,left=300,top=400,width=240,height=60');">
+							<input type="button" name="imgbtn2" value="画像表示" onfocus="ColFunc(2,'fine002',45);"  onClick="ColFunc(2,'fine002',45);　window.open('event_edit_img.jsp','画像表示','screenX=200,screenY=200,left=200,top=200,width=560,height=400');">
+							<span class="size10">※装飾する場合は、マウス等で装飾したいテキスト範囲を指定してから各ボタンをクリックしてください。</span>
+							</td>
+						</tr>
+						</table>
+						</div>
+					</td>
+				</tr>
+
+				<tr align="left">
+					<td >
+						<div class="honbun" id="dispArea2">
+						</div>
+					</td>
+				</tr>
+
+                <tr align="left" bgcolor="#FFFFFF">
+                    <td><img src="/common/pc/image/spacer.gif" width="200" height="3"></td>
+                </tr>
+
+				<tr>
+					<td class="honbuntitlebar">
+						<table width="100%" border="0" cellpadding="0" cellspacing="0" height="16">
+							<tr>
+								<td class="honbuntatitlebar_text">
+									<div id="msg_title_1" style="color:">
+										（3）：<select id="spansize1" name="spansize1" onfocus="ColFunc(3,'fine001',45);" onchange="if(spansize1.selectedIndex !=0){enclose('<font size=&quot;' + spansize1.options[spansize1.selectedIndex].value + '&quot;>', '</font>');spansize1.selectedIndex=0;return false;}">
+									<option value="">ヘッダー</option><option value="1">明細</option><option value="3" selected>合計</option></select>
+										繰り返し：<select id="spansize1" name="spansize1" onfocus="ColFunc(3,'fine001',45);" onchange="if(spansize1.selectedIndex !=0){enclose('<font size=&quot;' + spansize1.options[spansize1.selectedIndex].value + '&quot;>', '</font>');spansize1.selectedIndex=0;return false;}">
+									<option value="">1</option></select>
+									利用クラス:<input type="text" value="SalesToday">
+									</div>
+								</td>
+							</tr>
+						</table>
+					</td>
+
+				</tr>
+				<tr align="left" bgcolor="#FFFFFF">
+					<td class="size10"><img src="/common/pc/image/spacer.gif" width="200" height="3"></td>
+                </tr>
+
+				<tr align="left" bgcolor="#FFFFFF">
+					<td class="honbuntitlebar_text">
+						<div>
+							<textarea  id="col_msg3" name=col_msg3 rows=10 cols=164 onchange="CheckEdit();" onfocus="ColFunc(3,'fine001',45);get_pos(col_msg3);" onkeyup="ColFunc(3,'fine001',45);get_pos(col_msg3);" onmouseup="get_pos(col_msg3);" onmousedown="ColFunc(3,'fine001',45);" onblur="dispArea3.innerHTML='';">
+<table>
+<tr>
+<td class="bl bb" colspan=2>合　計</td>
+<td class="bl bb">%SalesToday%</td>
+<td class="bl bb">%SalesTodayTotal%</td>
+<td class="bl bb">%SalesTodayPrevious%</td>
+<td class="bl bb">%SalesTodayPerPrevious%</td>
+<td class="bl bb">%SalesTodayPerBudget%</td>
+<td class="bl bb">%VisitorsToday%</td>
+<td class="bl bb">%VisitorsTodayTotal%</td>
+<td class="bl bb">%VisitorsTodayPrevious%</td>
+<td class="bl bb">%VisitorsTodayPerPrevious%</td>
+<td class="bl bb">%GroupsToday%</td>
+<td class="bl bb">%GroupsTodayTotal%</td>
+<td class="bl bb">%GroupsTodayPrevious%</td>
+<td class="bl bb">%GroupsTodayPerPrevious%</td>
+<td class="bl bb">%UnitPrice%</td>
+<td class="bl bb">%UnitPricePerPrevious%</td>
+<td class="bl bb">%UnitPriceLunch%</td>
+<td class="bl bb">%UnitPriceLunchPerPrevious%</td>
+</tr>
+</table>
+							</textarea>
+						</div> 
+					</td>
+				</tr>
+
+<script language="javascript">
+if( String("jadge") ){
+ bl=3;
+} else if( document.getElementById ){
+ bl=4;
+}
+if( document.getElementById("col_msg3").setSelectionRange ){
+  bl=2;
+} else if( document.selection.createRange ){
+  bl=1;
+}
+</script>
+				<tr bgcolor="#FFFFFF">
+					<td align="left" valign="top">
+						<div class="size12">
+						<table border="0" cellpadding="0" cellspacing="0">
+						<tr>
+							<td class="size12">
+								<select id="spansize3" name="spansize3" onfocus="ColFunc(3,'fine002',45);" onchange="if(spansize2.selectedIndex !=0){enclose('<font size=&quot;' + spansize2.options[spansize2.selectedIndex].value + '&quot;>', '</font>');spansize2.selectedIndex=0;return false;}">
+									<option value="">文字サイズ</option><option value="2">小さく</option><option value="3">少し大きく</option><option value="4">大きく</option><option value="5">とても大きく</option></select>
+								<input type="button" name="strong3" value="太" style="font-weight:bold" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<strong>', '</strong>');return false;">
+								<input type="button" name="em3" value="斜" style="font-style:oblique" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<em>', '</em>');return false;">
+								<input type="button" name="under3" value="線" style="text-decoration:underline" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<u>', '</u>');return false;">
+							</td>
+							<td class="size12">
+<input type="image" border="0" style="margin:2px;margin-left:5px;" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<font color=&quot;#000000&quot;>', '</font>');return false;" src="/common/pc/image/000000.gif" alt="black"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<font color=&quot;#FF0000&quot;>', '</font>');return false;" src="/common/pc/image/FF0000.gif" alt="red"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<font color=&quot;#FF1493&quot;>', '</font>');return false;" src="/common/pc/image/FF1493.gif" alt="deeppink"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<font color=&quot;#800080&quot;>', '</font>');return false;" src="/common/pc/image/800080.gif" alt="purple"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<font color=&quot;#0000FF&quot;>', '</font>');return false;" src="/common/pc/image/0000FF.gif" alt="blue"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#008000&quot;>', '</font>');return false;" src="/common/pc/image/008000.gif" alt="green"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#808000&quot;>', '</font>');return false;" src="/common/pc/image/808000.gif" alt="olive"/><br/>
+<input type="image" border="0" style="margin:2px;margin-left:5px;" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<font color=&quot;#FFFFFF&quot;>', '</font>');return false;" src="/common/pc/image/FFFFFF.gif" alt="white"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<font color=&quot;#FA8072&quot;>', '</font>');return false;" src="/common/pc/image/FA8072.gif" alt="salmon"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<font color=&quot;#EE82EE&quot;>', '</font>');return false;" src="/common/pc/image/EE82EE.gif" alt="violet"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<font color=&quot;#9370DB&quot;>', '</font>');return false;" src="/common/pc/image/9370DB.gif" alt="mediumpurple"/><input type="image" border="0" style="margin:2px;" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<font color=&quot;#00BFFF&quot;>', '</font>');return false;" src="/common/pc/image/00BFFF.gif" alt="deepskyblue"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#33CC33&quot;>', '</font>');return false;" src="/common/pc/image/33CC33.gif" alt="limegreen"/><input type="image" border="0" style="margin:1px;" onfocus="ColFunc(1,'fine001',45);" onclick="enclose('<font color=&quot;#FFD700&quot;>', '</font>');return false;" src="/common/pc/image/FFD700.gif" alt="gold"/>
+							</td>
+							<td>
+								<input type="hidden" id="spancol3" name="spancol3" value="#" size=7 maxlength="7" onfocus="ColFunc(3,'fine002',45);" >
+								<!--							<input type="button" name="spanbtn3" value="色" onfocus="ColFunc(3,'fine002',45);" onclick="enclose('<span style=&quot;color:' + document.getElementById('spancol2').value+'&quot;>', '</span>');return false;">-->
+								<img border="0" style="background-color:white" src="/common/pc/image/color_btn.gif" name="color_btn_d3" width="100" height="22" align="absmiddle" id="color_btn_d3" onfocus="ColFunc(3,'fine002',45);" onClick="ColFunc(3,'fine002',45);MM_openBrWindowDetail('../../common/pc/event_edit_select_color.html','色見本','width=240,height=280',2)" onMouseOver="MM_swapImage('color_btn_d2','','/common/pc/image/color_btn_o.gif',2)" onMouseOut="MM_swapImgRestore()">
+							<input type="button" name="hrefbtn3" value="リンク" onfocus="ColFunc(3,'fine002',45);"  onClick="ColFunc(3,'fine002',45); window.open('../../common/pc/event_edit_link.html','リンク先','screenX=300,screenY=400,left=300,top=400,width=240,height=60');">
+							<input type="button" name="imgbtn3" value="画像表示" onfocus="ColFunc(3,'fine002',45);"  onClick="ColFunc(3,'fine002',45);　window.open('event_edit_img.jsp','画像表示','screenX=200,screenY=200,left=200,top=200,width=560,height=400');">
+							<span class="size10">※装飾する場合は、マウス等で装飾したいテキスト範囲を指定してから各ボタンをクリックしてください。</span>
+							</td>
+						</tr>
+						</table>
+						</div>
+					</td>
+				</tr>
+
+				<tr align="left">
+					<td >
+						<div class="honbun" id="dispArea3">
+						</div>
+					</td>
+			</tr>
+
+							<input type="hidden" name="hreflink" id="hreflink" value="http://">
+							<input type="hidden" name="hrefblank" id="hrefblank" value="_blank">
+							<input type="hidden" name="imglink" id="imglink" value="">
+<script language="javascript">
+</script>
+
+<!-- 小見出しここまで -->
+
+                  <tr align="left" bgcolor="#FFFFFF">
+                    <td><img src="/common/pc/image/spacer.gif" width="200" height="8"></td>
+                  </tr>
+                  <tr align="left" bgcolor="#FFFFFF">
+                    <td>
+                      <table width="100%" border="0" cellspacing="0" cellpadding="0">
+                        <tr>
+                          <td width="50%" align="center" valign="middle" bgcolor="#969EAD">
+                          <input name="regsubmit1" type=button value="下書き保存（非掲載）" onClick="if (validation_range('false','45')){MM_openInput2('event_edit', 'fine001', 45, 1,2)}">
+                          <input name="regsubmit2" type=button value="保存（掲載）" onClick="if (validation_range('false','45')){MM_openInput2('event_edit', 'fine001', 45, 1,1)}">
+						  </td>
+                          <td width="50%" align="center" valign="middle" bgcolor="#969EAD"><input name="presubmit" type=button value="プレビュー" onClick="MM_openPreview('preview', 45)"></td>
+
+                        </tr>
+                      </table>
+                    </td>
+                  </tr>
+                </table>
+
+              </td>
+              </form>
+
+              </tr>
+
+              <tr bgcolor="#FFFFFF">
+                <td valign="top">&nbsp;</td>
+                <td valign="top"></td>
+              </tr>
+              <tr bgcolor="#FFFFFF">
+                <td valign="top">&nbsp;</td>
+                <td height="30" align="center" valign="middle" bgcolor="#969EAD">
+                  <form action="event_edit_delete.jsp?HotelId=fine001&DataType=45&Id=1" method="POST">
+                  <input name="submit_del" type=button value="削除" onclick="if (confirm('削除します。よろしいですか？')){location.href='event_edit_delete.jsp?HotelId=fine001&DataType=45&Id=1'}">
+                </td></form>
+              </tr>
+
+              <tr bgcolor="#FFFFFF">
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+              </tr>
+              <tr bgcolor="#FFFFFF">
+                <td>&nbsp;</td>
+                <td align="center">
+                  <form action="event_list.jsp?HotelId=fine001&DataType=45" method="POST">
+                  <input name="submit_ret" type=submit value="戻る" >
+                  </form>
+                </td>
+              </tr>
+              <tr bgcolor="#FFFFFF">
+                <td>&nbsp;</td>
+                <td>&nbsp;</td>
+              </tr>
+            </table>
+        </td>
+        <td width="3" valign="top" align="left" height="100%" bgcolor="#FFFFFF">
+          <table width="3" height="100%" border="0" cellpadding="0" cellspacing="0">
+            <tr>
+              <td><img src="new/image/tab_kado.gif" width="3" height="3"></td>
+            </tr>
+            <tr>
+              <td bgcolor="#666666" height="100%"><img src="/common/pc/image/spacer.gif" width="3" height="100"></td>
+            </tr>
+          </table>
+        </td>
+      </tr>
+      <tr>
+        <td height="3" bgcolor="#999999">
+          <table width="100%" height="3" border="0" cellpadding="0" cellspacing="0">
+            <tr>
+              <td width="3"><img src="/common/pc/image/tab_kado2.gif" width="3" height="3"></td>
+              <td bgcolor="#666666"><img src="/common/pc/image/spacer.gif" width="100" height="3"></td>
+            </tr>
+          </table>
+        </td>
+        <td height="3" width="3"><img src="/common/pc/image/grey.gif" width="3" height="3"></td>
+      </tr>
+      <!-- ここまで -->
+    </table></td>
+  </tr>
+  <tr bgcolor="#FFFFFF">
+    <td><img src="/common/pc/image/spacer.gif" width="300" height="18"></td>
+  </tr>
+  <tr bgcolor="#FFFFFF">
+    <td align="center" valign="middle" class="size10"><!-- #BeginLibraryItem "/owner/Library/footer.lbi" --><img src="/common/pc/image/imedia.gif" width="63" height="18"><img src="/common/pc/image/spacer.gif" width="12" height="18" align="absmiddle">Copyrigtht&copy; almex
+    inc . All Rights Reserved.<!-- #EndLibraryItem --></td>
+  </tr>
+  <tr>
+    <td align="center" valign="middle"><img src="/common/pc/image/spacer.gif" width="300" height="12"></td>
+  </tr>
+</table>
+</body>
+</html>
+
+
